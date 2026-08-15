@@ -1,0 +1,30 @@
+[project]
+name = "sp-api"
+version = "0.1.0"
+description = "FastAPI service. HTTP only — all heavy work is enqueued (CLAUDE.md §4.1)."
+requires-python = ">=3.12"
+dependencies = [
+    "sp-core",
+    "sp-db",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "python-multipart>=0.0.20",
+    "redis>=5.2",
+    "celery>=5.4",
+    "itsdangerous>=2.2",
+    "email-validator>=2.2",
+    "google-auth>=2.37",
+    "httpx>=0.28",
+    "structlog>=24.4",
+]
+
+[tool.uv.sources]
+sp-core = { workspace = true }
+sp-db = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sp_api"]

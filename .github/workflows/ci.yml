@@ -1,0 +1,95 @@
+name: CI
+
+# CI is not advisory (CLAUDE.md §7) — every one of these must pass to merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sp
+          POSTGRES_PASSWORD: sp_dev_password
+          POSTGRES_DB: strava_premium
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sp -d strava_premium"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Typecheck (strict on core and db)
+        run: uv run mypy packages/core/src packages/db/src
+
+      - name: Create the non-superuser app role
+        # RLS is bypassed by superusers, so the app must connect as sp_app —
+        # mirrors infra/postgres-init.sql.
+        env:
+          PGPASSWORD: sp_dev_password
+        run: |
+          psql -h localhost -U sp -d strava_premium -c "CREATE ROLE sp_app WITH LOGIN PASSWORD 'sp_dev_password';"
+          psql -h localhost -U sp -d strava_premium -c "ALTER SCHEMA public OWNER TO sp_app; GRANT ALL ON SCHEMA public TO sp_app;"
+          psql -h localhost -U sp -d strava_premium -c 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"; CREATE EXTENSION IF NOT EXISTS "citext";'
+
+      - name: Unit tests
+        run: uv run pytest -m "not integration" --cov=packages/core/src/sp_core --cov-report=term --cov-fail-under=85
+
+      - name: Migrate
+        run: cd packages/db && uv run alembic upgrade head
+
+      - name: RLS isolation tests
+        # A data leak ends the project; this is never allowed to be skipped.
+        run: uv run pytest tests/test_rls_integration.py -m integration
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build

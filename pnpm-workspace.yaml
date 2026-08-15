@@ -1,0 +1,8 @@
+packages:
+  - "apps/web"
+
+# Both need their postinstall to fetch a platform-specific native binary;
+# without this they install but cannot run.
+allowBuilds:
+  "@biomejs/biome": true
+  esbuild: true

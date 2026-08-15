@@ -1,0 +1,91 @@
+[project]
+name = "strava-premium"
+version = "0.1.0"
+description = "Self-hosted analytics over your own Strava data"
+requires-python = ">=3.12"
+dependencies = [
+    "sp-core",
+    "sp-db",
+    "sp-api",
+    "sp-worker",
+]
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/api", "apps/worker"]
+
+[tool.uv.sources]
+sp-core = { workspace = true }
+sp-db = { workspace = true }
+sp-api = { workspace = true }
+sp-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-requests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["packages/db/migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "ASYNC", "S"]
+ignore = [
+    "S101",    # assert — used in tests
+    "B008",    # function call in default arg — FastAPI Depends() idiom
+    # Docs and docstrings use real typography (en dashes, arrows). That is
+    # deliberate prose, not a homoglyph attack.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+# Settings defaults are placeholder dev values, not real credentials; the file
+# documents that they must be replaced outside development.
+"packages/core/src/sp_core/config.py" = ["S105"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# Third-party packages without stubs.
+module = [
+    "fitdecode.*",
+    "gpxpy.*",
+    "boto3.*",
+    "botocore.*",
+    "celery.*",
+    "pyarrow.*",
+    "defusedxml.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Apps are non-strict per CLAUDE.md §3.
+module = ["sp_api.*", "sp_worker.*"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: requires a live Postgres/Redis/MinIO (docker compose up)",
+]
+
+[tool.coverage.run]
+source = ["packages/core/src/sp_core"]
+omit = ["*/tests/*"]

@@ -1,0 +1,28 @@
+[project]
+name = "sp-core"
+version = "0.1.0"
+description = "Domain models, canonical schema, parsers and metrics. Pure — no DB, no network."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "numpy>=2.1",
+    "pyarrow>=18.0",
+    "fitdecode>=0.10",
+    "gpxpy>=1.6",
+    # Activity files come from user-supplied zips. defusedxml blocks entity
+    # expansion ("billion laughs") that would take a worker down.
+    "defusedxml>=0.7.1",
+    "boto3>=1.35",
+    "argon2-cffi>=23.1",
+    "cryptography>=44.0",
+    "httpx>=0.28",
+    "structlog>=24.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sp_core"]
