@@ -98,11 +98,15 @@ if [ -f .env ]; then
   echo ".env already exists — leaving it as-is. Delete it first if you want"
   echo "to redo this step."
 else
-  echo "Enter your R2 details (from docs/DEPLOYMENT.md §1):"
+  echo "Enter your R2 details (from docs/DEPLOYMENT.md §1)."
+  echo "Tip: if pasting into the masked secret-key prompt is giving you"
+  echo "trouble over SSH, Ctrl+C out and instead run:"
+  echo "  export R2_SECRET_KEY='paste-here'"
+  echo "then re-run this script — it'll skip the prompt and use that instead."
   R2_ACCOUNT_ID=$(ask "R2 Account ID")
   R2_BUCKET=$(ask "R2 bucket name" "strava-premium-prod")
   R2_ACCESS_KEY=$(ask "R2 Access Key ID")
-  R2_SECRET_KEY=$(ask_secret "R2 Secret Access Key")
+  R2_SECRET_KEY="${R2_SECRET_KEY:-$(ask_secret "R2 Secret Access Key")}"
   echo
   echo "Domains (leave blank to fill in later, e.g. before the Tunnel step):"
   API_DOMAIN=$(ask "API domain, e.g. api.yourdomain.com" "")
