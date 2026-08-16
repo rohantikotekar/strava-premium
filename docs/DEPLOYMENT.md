@@ -134,9 +134,9 @@ and you need to finish a step by hand.
    docker compose --profile full up -d --build postgres redis api worker
    ```
    This builds `infra/api.Dockerfile` and `infra/worker.Dockerfile` and starts Postgres, Redis, the API, and the worker — four containers, one VM. If you're on a 1GB instance (`t2.micro`/`t3.micro`), set `WORKER_CONCURRENCY=1` in `.env` first and add a 2GB swap file — see the script's automatic handling of this if you'd rather not do it by hand.
-4. Run the migration, from inside the running API container (so it uses the internal Docker network — Postgres is never exposed to the internet):
+4. Run the migration, from inside the running API container (so it uses the internal Docker network — Postgres is never exposed to the internet). `alembic.ini`'s `script_location = migrations` resolves relative to the working directory Alembic runs from, not the `-c` path, so this has to run from `packages/db` (matching how the [Makefile](../Makefile) does it locally) rather than the container's default `/app`:
    ```bash
-   docker compose exec api python -m alembic -c /app/packages/db/alembic.ini upgrade head
+   docker compose exec -w /app/packages/db api python -m alembic upgrade head
    ```
 5. Sanity check: `curl http://localhost:8000/health` should return `{"status":"ok"}`.
 
@@ -224,9 +224,9 @@ Unlike Oracle's Always Free tier, **this isn't free indefinitely** — EC2's fre
    ```
 
 5. Railway generates a `*.up.railway.app` URL immediately — attach `api.yourdomain.com` as a custom domain once ready (Railway → Settings → Domains, then a CNAME in Cloudflare).
-6. Run the migration once, from your machine, pointed at the Railway Postgres URL:
+6. Run the migration once, from your machine, pointed at the Railway Postgres URL. Same `script_location`-is-relative-to-cwd gotcha as the AWS/Oracle path — run it from inside `packages/db`, not the repo root:
    ```bash
-   DATABASE_URL=<railway postgres url> uv run alembic -c packages/db/alembic.ini upgrade head
+   cd packages/db && DATABASE_URL=<railway postgres url> uv run alembic upgrade head
    ```
    Same non-superuser-role requirement applies as local dev — run [infra/postgres-init.sql](../infra/postgres-init.sql)'s `sp_app` role creation against the Railway database first (Railway's default user is enough of a superuser to bypass RLS otherwise — CLAUDE.md §4.5).
 

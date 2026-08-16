@@ -181,7 +181,10 @@ for i in $(seq 1 30); do
 done
 
 bold "== 5/6: Run the migration =="
-$DC exec -T api python -m alembic -c /app/packages/db/alembic.ini upgrade head
+# alembic.ini's script_location is relative to the CWD alembic runs from,
+# not to the -c ini path — so this must run from packages/db (matching how
+# the Makefile does it locally), not the container's default /app WORKDIR.
+$DC exec -T -w /app/packages/db api python -m alembic upgrade head
 
 bold "== 6/6: Cloudflare Tunnel (public HTTPS, no open security-group ports) =="
 if [ -z "${API_DOMAIN:-}" ]; then
