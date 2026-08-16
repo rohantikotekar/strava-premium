@@ -8,6 +8,14 @@
  *  - year-over-year is emphasis (one hue + grey), not ten categorical hues
  */
 
+import type { ChartResponse } from "@/lib/api";
+import {
+  type UnitPref,
+  formatClock,
+  formatDistance,
+  formatDuration,
+  sportLabel,
+} from "@/lib/format";
 import {
   Area,
   Bar,
@@ -23,14 +31,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ChartResponse } from "@/lib/api";
-import {
-  type UnitPref,
-  formatClock,
-  formatDistance,
-  formatDuration,
-  sportLabel,
-} from "@/lib/format";
 
 const AXIS = { fill: "var(--text-muted)", fontSize: 11 };
 const GRID = "var(--gridline)";
@@ -83,7 +83,13 @@ export function FitnessChart({ data }: { data: ChartResponse }) {
       <ResponsiveContainer width="100%" height={200}>
         <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={GRID} vertical={false} />
-          <XAxis dataKey="day" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--baseline)" }} minTickGap={40} />
+          <XAxis
+            dataKey="day"
+            tick={AXIS}
+            tickLine={false}
+            axisLine={{ stroke: "var(--baseline)" }}
+            minTickGap={40}
+          />
           <YAxis tick={AXIS} tickLine={false} axisLine={false} width={38} />
           <Tooltip {...tooltipStyle} />
           <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-secondary)" }} />
@@ -113,15 +119,21 @@ export function FitnessChart({ data }: { data: ChartResponse }) {
       <ResponsiveContainer width="100%" height={90}>
         <BarChart data={points} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={GRID} vertical={false} />
-          <XAxis dataKey="day" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--baseline)" }} minTickGap={40} />
+          <XAxis
+            dataKey="day"
+            tick={AXIS}
+            tickLine={false}
+            axisLine={{ stroke: "var(--baseline)" }}
+            minTickGap={40}
+          />
           <YAxis tick={AXIS} tickLine={false} axisLine={false} width={38} />
           <Tooltip {...tooltipStyle} />
           <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-secondary)" }} />
           {/* Diverging: fresh above the line, fatigued below. */}
           <Bar dataKey="tsb" name="Form" radius={[2, 2, 0, 0]}>
-            {points.map((point, index) => (
+            {points.map((point) => (
               <Cell
-                key={index}
+                key={String(point.day)}
                 fill={Number(point.tsb ?? 0) >= 0 ? "var(--series-1)" : "var(--series-8)"}
               />
             ))}
@@ -139,7 +151,13 @@ export function WeeklyVolumeChart({ data, pref }: { data: ChartResponse; pref: U
     <ResponsiveContainer width="100%" height={240}>
       <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke={GRID} vertical={false} />
-        <XAxis dataKey="week" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--baseline)" }} minTickGap={30} />
+        <XAxis
+          dataKey="week"
+          tick={AXIS}
+          tickLine={false}
+          axisLine={{ stroke: "var(--baseline)" }}
+          minTickGap={30}
+        />
         <YAxis
           tick={AXIS}
           tickLine={false}
@@ -177,7 +195,13 @@ export function SportMixChart({ data }: { data: ChartResponse }) {
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke={GRID} vertical={false} />
-        <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--baseline)" }} minTickGap={30} />
+        <XAxis
+          dataKey="month"
+          tick={AXIS}
+          tickLine={false}
+          axisLine={{ stroke: "var(--baseline)" }}
+          minTickGap={30}
+        />
         <YAxis
           tick={AXIS}
           tickLine={false}
@@ -269,7 +293,11 @@ export function ZonesChart({ data }: { data: ChartResponse }) {
     <div className="flex flex-col gap-3">
       {/* One stacked horizontal bar. Ordinal ramp: zones are ordered, so five
           different hues would destroy the ordering. */}
-      <div className="flex h-8 w-full overflow-hidden rounded-md" role="img" aria-label="Time in zone">
+      <div
+        className="flex h-8 w-full overflow-hidden rounded-md"
+        role="img"
+        aria-label="Time in zone"
+      >
         {points.map((point, index) => {
           const seconds = Number(point.seconds ?? 0);
           const pct = total > 0 ? (seconds / total) * 100 : 0;
@@ -343,10 +371,7 @@ export function CurveChart({ data, unit }: { data: ChartResponse; unit: string }
           tickFormatter={(v) => formatClock(Number(v))}
         />
         <YAxis tick={AXIS} tickLine={false} axisLine={false} width={44} unit={unit} />
-        <Tooltip
-          {...tooltipStyle}
-          labelFormatter={(v) => `Duration ${formatClock(Number(v))}`}
-        />
+        <Tooltip {...tooltipStyle} labelFormatter={(v) => `Duration ${formatClock(Number(v))}`} />
         <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-secondary)" }} />
         <Line
           type="monotone"

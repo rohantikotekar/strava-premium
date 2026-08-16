@@ -1,8 +1,8 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
-import { Banner, Button, Card, Input } from "@/components/ui/primitives";
+import { Banner, Button, Card, Input, ThemeToggle } from "@/components/ui/primitives";
 import { useAuthProviders, useLogin, useSignup } from "@/features/auth/useAuth";
 import { type ApiError, type User, api } from "@/lib/api";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { type FormEvent, useState } from "react";
 
 /**
  * Signup / login.
@@ -56,117 +56,118 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-4 py-12">
-      <header className="text-center">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-          See ten years of your training, properly
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          All the analysis Strava charges for — plus a few things it doesn't have. Your data
-          stays yours.
-        </p>
-      </header>
+    <div className="accent-glow flex min-h-full flex-col">
+      <div className="flex justify-end px-4 pt-4">
+        <ThemeToggle />
+      </div>
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 pb-16">
+        <header className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+            See ten years of your training, properly
+          </h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            All the analysis Strava charges for — plus a few things it doesn't have. Your data stays
+            yours.
+          </p>
+        </header>
 
-      {search.error === "account_exists" && (
-        <Banner tone="warning" title="You already have an account">
-          An account already exists for that email address. Sign in with your password, then
-          link Google from Settings.
-        </Banner>
-      )}
-      {search.error && search.error !== "account_exists" && (
-        <Banner tone="warning" title="Google sign-in didn't complete">
-          Something went wrong on the way back from Google. Please try again.
-        </Banner>
-      )}
-
-      <Card className="flex flex-col gap-4">
-        {providers?.google && (
-          <>
-            <a
-              href="/api/auth/google/start"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--page)]"
-            >
-              <span aria-hidden="true" className="font-bold">
-                G
-              </span>
-              Continue with Google
-            </a>
-            <div className="flex items-center gap-3">
-              <span className="h-px flex-1 bg-[var(--border)]" />
-              <span className="text-xs text-[var(--text-muted)]">or</span>
-              <span className="h-px flex-1 bg-[var(--border)]" />
-            </div>
-          </>
+        {search.error === "account_exists" && (
+          <Banner tone="warning" title="You already have an account">
+            An account already exists for that email address. Sign in with your password, then link
+            Google from Settings.
+          </Banner>
+        )}
+        {search.error && search.error !== "account_exists" && (
+          <Banner tone="warning" title="Google sign-in didn't complete">
+            Something went wrong on the way back from Google. Please try again.
+          </Banner>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            name="email"
-            type="email"
-            label="Email address"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+        <Card className="flex flex-col gap-4">
+          {providers?.google && (
+            <>
+              <a
+                href="/api/auth/google/start"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--page)]"
+              >
+                <span aria-hidden="true" className="font-bold">
+                  G
+                </span>
+                Continue with Google
+              </a>
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-[var(--border)]" />
+                <span className="text-xs text-[var(--text-muted)]">or</span>
+                <span className="h-px flex-1 bg-[var(--border)]" />
+              </div>
+            </>
+          )}
 
-          <div className="flex flex-col gap-1.5">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              label="Password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              name="email"
+              type="email"
+              label="Email address"
+              autoComplete="email"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              // A live hint rather than a red error before they've even submitted.
-              hint={
-                mode === "signup"
-                  ? "12+ characters — a passphrase works great."
-                  : undefined
-              }
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-            {/* A "show password" toggle beats a confirm-password field. */}
+
+            <div className="flex flex-col gap-1.5">
+              <Input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                label="Password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                // A live hint rather than a red error before they've even submitted.
+                hint={mode === "signup" ? "12+ characters — a passphrase works great." : undefined}
+              />
+              {/* A "show password" toggle beats a confirm-password field. */}
+              <button
+                type="button"
+                className="self-start text-xs text-[var(--text-muted)] underline"
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? "Hide password" : "Show password"}
+              </button>
+            </div>
+
+            {failure && (
+              <p role="alert" className="text-sm text-[var(--status-critical)]">
+                {failure.message}
+              </p>
+            )}
+            {notice && <p className="text-sm text-[var(--text-secondary)]">{notice}</p>}
+
+            <Button type="submit" loading={pending}>
+              {mode === "signup" ? "Create account" : "Log in"}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-[var(--text-secondary)]">
+            {mode === "signup" ? "Already have an account?" : "New here?"}{" "}
             <button
               type="button"
-              className="self-start text-xs text-[var(--text-muted)] underline"
-              onClick={() => setShowPassword((v) => !v)}
+              className="font-medium text-[var(--series-1)] underline"
+              onClick={() => {
+                setMode(mode === "signup" ? "login" : "signup");
+                login.reset();
+                signup.reset();
+              }}
             >
-              {showPassword ? "Hide password" : "Show password"}
+              {mode === "signup" ? "Log in" : "Create an account"}
             </button>
-          </div>
+          </p>
+        </Card>
 
-          {failure && (
-            <p role="alert" className="text-sm text-[var(--status-critical)]">
-              {failure.message}
-            </p>
-          )}
-          {notice && <p className="text-sm text-[var(--text-secondary)]">{notice}</p>}
-
-          <Button type="submit" loading={pending}>
-            {mode === "signup" ? "Create account" : "Log in"}
-          </Button>
-        </form>
-
-        <p className="text-center text-sm text-[var(--text-secondary)]">
-          {mode === "signup" ? "Already have an account?" : "New here?"}{" "}
-          <button
-            type="button"
-            className="font-medium text-[var(--series-1)] underline"
-            onClick={() => {
-              setMode(mode === "signup" ? "login" : "signup");
-              login.reset();
-              signup.reset();
-            }}
-          >
-            {mode === "signup" ? "Log in" : "Create an account"}
-          </button>
+        <p className="text-center text-xs text-[var(--text-muted)]">
+          We only ever read your Strava data. We never post.
         </p>
-      </Card>
-
-      <p className="text-center text-xs text-[var(--text-muted)]">
-        We only ever read your Strava data. We never post.
-      </p>
-    </main>
+      </main>
+    </div>
   );
 }

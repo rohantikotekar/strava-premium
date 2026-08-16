@@ -8,7 +8,11 @@
  * Pydantic response model first.
  */
 
-const BASE = "/api";
+// "/api" in dev — Vite proxies it to the local API (vite.config.ts) so the
+// session cookie stays first-party. In production there is no such proxy, so
+// a real deployment sets VITE_API_BASE (e.g. https://api.yourdomain.com) as a
+// build-time env var — see DEPLOYMENT.md § Cloudflare Pages.
+const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 export class ApiError extends Error {
   constructor(

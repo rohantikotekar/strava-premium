@@ -120,11 +120,7 @@ export function formatDateTime(iso: string): string {
 }
 
 /** Formats a stat tile by its declared unit. */
-export function formatByUnit(
-  value: number | null,
-  unit: string,
-  pref: UnitPref,
-): string {
+export function formatByUnit(value: number | null, unit: string, pref: UnitPref): string {
   switch (unit) {
     case "m":
       return formatDistance(value, pref);

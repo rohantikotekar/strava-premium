@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
 import { Banner, Button, Card, Input } from "@/components/ui/primitives";
 import { useCurrentUser, useUpdateProfile } from "@/features/auth/useAuth";
 import { api } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
 
 /**
  * Settings — the screen where trust is won or lost.
@@ -49,22 +49,22 @@ export function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <h1 className="text-xl font-semibold text-[var(--text-primary)]">Settings</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Settings</h1>
 
       {missingZones && (
         <Banner tone="warning" title="Your training load is estimated">
-          Without a max heart rate or FTP we estimate load from duration alone. Set either one
-          below and we'll recompute your whole history properly.
+          Without a max heart rate or FTP we estimate load from duration alone. Set either one below
+          and we'll recompute your whole history properly.
         </Banner>
       )}
 
       <Card>
-        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
+        <h2 className="mb-1 text-base font-semibold text-[var(--text-primary)]">
           Zones & thresholds
         </h2>
         <p className="mb-4 text-xs text-[var(--text-secondary)]">
-          Changing these recomputes training load for every activity you have. It takes about
-          a minute.
+          Changing these recomputes training load for every activity you have. It takes about a
+          minute.
         </p>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -134,7 +134,7 @@ export function SettingsPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Account</h2>
+        <h2 className="mb-1 text-base font-semibold text-[var(--text-primary)]">Account</h2>
         <dl className="mt-3 flex flex-col gap-2 text-sm">
           <div className="flex justify-between gap-3">
             <dt className="text-[var(--text-secondary)]">Email</dt>
@@ -167,8 +167,7 @@ export function SettingsPage() {
               Disconnect Strava
             </Button>
             <p className="mt-2 text-xs text-[var(--text-muted)]">
-              Your imported history stays, and your account keeps working. Only the live sync
-              stops.
+              Your imported history stays, and your account keeps working. Only the live sync stops.
             </p>
           </div>
         )}

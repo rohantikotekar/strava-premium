@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
 import { Banner, Button, Card, EmptyState } from "@/components/ui/primitives";
 import { type ImportStatus, type UploadCreated, api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { checkStravaExportZip } from "@/lib/zipPeek";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
-type Phase = "idle" | "uploading" | "processing" | "done" | "error";
+type Phase = "idle" | "checking" | "uploading" | "processing" | "done" | "error";
 
 /**
  * The import wizard.
@@ -99,9 +100,11 @@ export function ImportPage() {
     },
   });
 
-  function handleFile(file: File | undefined) {
+  async function handleFile(file: File | undefined) {
     if (!file) return;
-    // Catch the wrong file *before* a multi-GB upload.
+    // Catch the wrong file *before* a multi-GB upload — both a cheap name
+    // check and a real read of the zip's own central directory, entirely
+    // local (INGESTION.md §2). We don't want people uploading random zips.
     if (!file.name.toLowerCase().endsWith(".zip")) {
       setPhase("error");
       setMessage(
@@ -109,13 +112,29 @@ export function ImportPage() {
       );
       return;
     }
+
+    setPhase("checking");
+    setMessage(null);
+    const check = await checkStravaExportZip(file);
+    if (!check.ok) {
+      setPhase("error");
+      setMessage(
+        check.reason === "not_a_zip"
+          ? "That file doesn't look like a valid zip archive. Make sure you're uploading the export Strava emailed you."
+          : "This zip doesn't contain activities.csv, so it isn't a Strava export. Make sure you're uploading the archive from Strava's \"Download or Delete Your Account\" page, not a folder you zipped yourself.",
+      );
+      return;
+    }
+
     upload.mutate(file);
   }
 
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-xl font-semibold text-[var(--text-primary)]">Import your history</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+          Import your history
+        </h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Ten years of data, analysed locally. Nothing leaves your machine.
         </p>
@@ -123,12 +142,12 @@ export function ImportPage() {
 
       <Card className="flex flex-col gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
             Step 1 — Request your archive from Strava
           </h2>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Strava has to prepare your file. It usually takes a few hours, and they'll email
-            you a download link.
+            Strava has to prepare your file. It usually takes a few hours, and they'll email you a
+            download link.
           </p>
           <a
             href="https://www.strava.com/athlete/delete_your_account"
@@ -141,7 +160,7 @@ export function ImportPage() {
         </div>
 
         <div className="border-t border-[var(--border)] pt-4">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
             Step 2 — Upload it here
           </h2>
 
@@ -171,6 +190,10 @@ export function ImportPage() {
             </div>
           )}
 
+          {phase === "checking" && (
+            <p className="mt-3 text-sm text-[var(--text-secondary)]">Checking your file…</p>
+          )}
+
           {phase === "uploading" && (
             <div className="mt-3">
               <p className="text-sm text-[var(--text-secondary)]">Uploading your archive…</p>
@@ -191,8 +214,8 @@ export function ImportPage() {
                     </a>
                   }
                 >
-                  We're still analysing detailed data from your files — charts will get richer
-                  as it finishes.
+                  We're still analysing detailed data from your files — charts will get richer as it
+                  finishes.
                 </Banner>
               ) : (
                 <p className="text-sm text-[var(--text-secondary)]">
@@ -247,33 +270,13 @@ export function ImportPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Import history</h2>
+        <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">Import history</h2>
         {!history || history.length === 0 ? (
           <EmptyState title="No imports yet." />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-3">
             {history.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-2 text-sm last:border-0"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[var(--text-primary)]">
-                    {item.filename ?? "export.zip"}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {formatDateTime(item.created_at)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[var(--text-secondary)]">{item.status}</p>
-                  {item.items_failed > 0 && (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {item.items_failed} unreadable
-                    </p>
-                  )}
-                </div>
-              </li>
+              <ImportHistoryRow key={item.id} item={item} />
             ))}
           </ul>
         )}
@@ -282,17 +285,104 @@ export function ImportPage() {
   );
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  awaiting_file: "Awaiting file",
+  queued: "Queued",
+  inspecting: "Inspecting",
+  fast_path: "Dashboard ready — analysing details",
+  deep_parse: "Analysing details",
+  finalizing: "Finalising",
+  complete: "Complete",
+  failed: "Failed",
+};
+
+const DELETABLE_STATUSES = new Set(["awaiting_file", "complete", "failed"]);
+
+function ImportHistoryRow({ item }: { item: ImportStatus }) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: () => api.delete<{ message: string }>(`/imports/${item.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["imports"] });
+    },
+  });
+
+  const canDelete = DELETABLE_STATUSES.has(item.status);
+
+  return (
+    <li className="flex flex-col gap-2 border-b border-[var(--border)] pb-3 text-sm last:border-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[var(--text-primary)]">{item.filename ?? "export.zip"}</p>
+          <p className="text-xs text-[var(--text-muted)]">{formatDateTime(item.created_at)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="text-right">
+            <p
+              className={
+                item.status === "failed"
+                  ? "font-medium text-[var(--status-critical)]"
+                  : "text-[var(--text-secondary)]"
+              }
+            >
+              {STATUS_LABELS[item.status] ?? item.status}
+            </p>
+            {item.items_failed > 0 && (
+              <p className="text-xs text-[var(--text-muted)]">{item.items_failed} unreadable</p>
+            )}
+          </div>
+
+          {canDelete &&
+            (confirming ? (
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="danger" onClick={() => remove.mutate()}>
+                  {remove.isPending ? "Deleting…" : "Confirm"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Delete ${item.filename ?? "this import"}`}
+                onClick={() => setConfirming(true)}
+              >
+                Delete
+              </Button>
+            ))}
+        </div>
+      </div>
+
+      {/* The specific reason, not just the bare word "failed" — CLAUDE.md §4.6:
+          partial/total failure is communicated, never a dead end. */}
+      {item.status === "failed" && item.error && (
+        <p className="text-xs text-[var(--status-critical)]">{item.error}</p>
+      )}
+      {remove.isError && (
+        <p className="text-xs text-[var(--status-critical)]">
+          Couldn't delete that import. Try again in a moment.
+        </p>
+      )}
+    </li>
+  );
+}
+
 function ProgressBar({ pct }: { pct: number }) {
+  // Decorative: the real number is always shown as adjacent text (the caller
+  // renders "N%" or "done / total" next to this), so a `progressbar` role here
+  // would be a second, redundant announcement without its own accessible name —
+  // worse for screen readers than just hiding the bar and keeping the text.
   return (
     <div
+      aria-hidden="true"
       className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--page)]"
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
     >
       <div
-        className="h-full rounded-full bg-[var(--series-1)] transition-[width]"
+        className="h-full rounded-full bg-[var(--accent)] transition-[width]"
         style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
       />
     </div>

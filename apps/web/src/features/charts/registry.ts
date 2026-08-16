@@ -77,8 +77,7 @@ export const CHART_REGISTRY: ChartDef[] = [
     question: "Am I ahead of where I was?",
     requires: [],
     minSpanDays: 400,
-    unlockHint:
-      "Import at least two years of history to compare this year against last.",
+    unlockHint: "Import at least two years of history to compare this year against last.",
     section: "progress",
     span: 2,
   },

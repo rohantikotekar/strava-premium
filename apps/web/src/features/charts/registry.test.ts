@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { CapabilitiesResponse } from "@/lib/api";
+import { describe, expect, it } from "vitest";
 import { buildCapabilityIndex, resolveCharts } from "./registry";
 
 /**
@@ -89,9 +89,7 @@ describe("resolveCharts", () => {
     const long = buildCapabilityIndex(
       capabilities([], { first: "2022-01-01", last: "2024-06-01" }),
     );
-    expect(resolveCharts(long, "progress").available.map((c) => c.id)).toContain(
-      "year-over-year",
-    );
+    expect(resolveCharts(long, "progress").available.map((c) => c.id)).toContain("year-over-year");
   });
 
   it("hides sport mix for a single-sport athlete", () => {

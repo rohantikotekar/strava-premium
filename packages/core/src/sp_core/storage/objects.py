@@ -126,6 +126,12 @@ def object_size(key: str) -> int | None:
     return int(response["ContentLength"])
 
 
+def delete_object(key: str) -> None:
+    """Delete a single object. Missing is not an error — deletion is idempotent."""
+    with contextlib.suppress(ClientError):
+        internal_client().delete_object(Bucket=get_settings().s3_bucket, Key=key)
+
+
 def delete_prefix(prefix: str) -> int:
     """Delete every object under a prefix. Used by account/Strava deletion."""
     client = internal_client()

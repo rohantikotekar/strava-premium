@@ -16,6 +16,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sp_core.storage.objects import (
+    delete_object,
     object_exists,
     object_size,
     presign_put,
@@ -215,6 +216,17 @@ async def import_events(
 
 @router.delete("/imports/{upload_id}", response_model=Message)
 async def delete_import(upload_id: UUID, session: DbSession, user: CurrentUser) -> Message:
+    """Delete an import record and its raw archive.
+
+    A deliberate, user-initiated exception to "raw data is immutable and kept"
+    (CLAUDE.md §4.3) — that principle is about *us* never discarding data behind
+    the user's back so we can recompute from source; it was never meant to stop
+    someone reclaiming storage or removing a multi-GB export of their own
+    location history once it's served its purpose. Only the raw zip goes —
+    already-imported activities, streams, and derived metrics are untouched
+    (`ingest_items` rows cascade-delete with the row, but those are just
+    per-file bookkeeping, not user data).
+    """
     upload = (
         await session.execute(
             select(Upload).where(Upload.id == upload_id, Upload.user_id == user.id)
@@ -222,8 +234,17 @@ async def delete_import(upload_id: UUID, session: DbSession, user: CurrentUser) 
     ).scalar_one_or_none()
     if upload is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No such import.")
+    if upload.status not in ("awaiting_file", "complete", "failed"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="This import is still running. Wait for it to finish before deleting it.",
+        )
+
+    if upload.object_key:
+        delete_object(upload.object_key)
     await session.delete(upload)
-    return Message(message="Import record removed. Your activities were kept.")
+    log.info("upload.deleted", upload_id=str(upload_id), user_id=str(user.id))
+    return Message(message="Import removed and the uploaded archive was deleted. Your activities were kept.")
 
 
 @router.get("/imports/{upload_id}/summary")

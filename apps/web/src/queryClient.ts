@@ -1,5 +1,5 @@
-import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api";
+import { QueryClient } from "@tanstack/react-query";
 
 /**
  * TanStack Query owns all server state (CLAUDE.md §3). No server data lives in

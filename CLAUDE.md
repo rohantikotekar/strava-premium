@@ -35,6 +35,7 @@ Full docs live in [docs/](docs/):
 | [FEATURES.md](docs/FEATURES.md) | Feature → metric → chart mapping, v1/v2/v3 |
 | [FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) | UI/UX plan, chart specs, design tokens |
 | [EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md) | Milestones, cut lines, definition of done |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Hosting plan, launch checklist, scaling path |
 
 ---
 

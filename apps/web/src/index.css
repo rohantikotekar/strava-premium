@@ -19,8 +19,13 @@
 :root {
   color-scheme: light;
 
+  /* --page is deliberately a visible step darker than --surface-1, not a
+   * near-identical off-white (#f9f9f7 was only ~1.03:1 apart — imperceptible,
+   * so cards and page read as one flat white sheet). --surface-1 stays
+   * unchanged since it's what the chart-color contrast checks below are
+   * validated against. */
   --surface-1: #fcfcfb;
-  --page: #f9f9f7;
+  --page: #ece9e2;
   --text-primary: #0b0b0b;
   --text-secondary: #52514e;
   --text-muted: #898781;
@@ -53,20 +58,44 @@
   --delta-good: #006300;
 
   --de-emphasis: #c3c2b7;
+
+  /* Brand accent — UI chrome only (buttons, active nav, badges). Never used
+   * inside a chart mark: chart color always means a specific series
+   * (--series-N), and reusing this here would make a button look like data.
+   * Distinct from --series-2 on purpose, so an accented button next to an
+   * orange "Ride" chart segment never reads as the same entity. */
+  --accent: #cc4e10;
+  --accent-ink: #ffffff;
+  --accent-wash: rgb(204 78 16 / 0.1);
+
+  /* Card elevation. Light mode reads depth from a real drop shadow; dark mode
+   * cannot — a black shadow is invisible on a near-black page — so it reads
+   * depth from a soft ambient shadow plus a 1px "rim light" top edge instead
+   * (an inset highlight, the standard dark-UI substitute for shadow). Kept as
+   * its own token rather than Tailwind's shadow-sm so the technique can differ
+   * per mode without touching --surface-1, which the chart-color contrast
+   * checks above are validated against. */
+  --card-shadow: 0 1px 2px rgb(11 11 11 / 0.05), 0 1px 1px rgb(11 11 11 / 0.04);
+  --card-shadow-hover: 0 8px 20px rgb(11 11 11 / 0.08), 0 2px 6px rgb(11 11 11 / 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
+    /* Darkened relative to --surface-1 (unchanged, see the note above) so
+     * cards visibly separate from the page instead of nearly matching it. */
     --surface-1: #1a1a19;
-    --page: #0d0d0d;
+    --page: #050505;
     --text-primary: #ffffff;
     --text-secondary: #c3c2b7;
     --text-muted: #898781;
     --gridline: #2c2c2a;
     --baseline: #383835;
-    --border: rgb(255 255 255 / 0.1);
+    --border: rgb(255 255 255 / 0.12);
+
+    --card-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 2px 8px rgb(0 0 0 / 0.5);
+    --card-shadow-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.6);
 
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -85,6 +114,10 @@
 
     --delta-good: #0ca30c;
     --de-emphasis: #383835;
+
+    --accent: #f0793d;
+    --accent-ink: #1a1a19;
+    --accent-wash: rgb(240 121 61 / 0.16);
   }
 }
 
@@ -92,13 +125,16 @@
   color-scheme: dark;
 
   --surface-1: #1a1a19;
-  --page: #0d0d0d;
+  --page: #050505;
   --text-primary: #ffffff;
   --text-secondary: #c3c2b7;
   --text-muted: #898781;
   --gridline: #2c2c2a;
   --baseline: #383835;
-  --border: rgb(255 255 255 / 0.1);
+  --border: rgb(255 255 255 / 0.12);
+
+  --card-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 2px 8px rgb(0 0 0 / 0.5);
+  --card-shadow-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.6);
 
   --series-1: #3987e5;
   --series-2: #d95926;
@@ -117,6 +153,10 @@
 
   --delta-good: #0ca30c;
   --de-emphasis: #383835;
+
+  --accent: #f0793d;
+  --accent-ink: #1a1a19;
+  --accent-wash: rgb(240 121 61 / 0.16);
 }
 
 @theme inline {
@@ -135,6 +175,14 @@ body,
   height: 100%;
 }
 
+html {
+  /* A gentle, site-wide nudge — every Tailwind text-* size is rem-based off
+   * this, so this one line lifts body copy, tables and labels a touch
+   * without hand-editing every component. Hero figures get an explicit
+   * larger step on top of this (see DashboardPage / ActivityDetailPage). */
+  font-size: 106%;
+}
+
 body {
   background: var(--page);
   color: var(--text-primary);
@@ -146,6 +194,24 @@ body {
    numbers keep proportional ones (dataviz § typeface). */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* Card elevation — see the --card-shadow tokens above for why this is a
+   custom property and not Tailwind's shadow-sm/shadow-md. */
+.card-elevated {
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 150ms ease;
+}
+.card-elevated:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* A quiet accent-tinted glow for the rare "welcome" moment (login/signup) —
+ * not used on data screens, where it would compete with the charts. Strava's
+ * marketing pages lean on bold color blocks; this is the restrained version
+ * that fits an app whose whole job is to be read, not sold. */
+.accent-glow {
+  background: radial-gradient(60% 50% at 50% 0%, var(--accent-wash), transparent 70%), var(--page);
 }
 
 @media (prefers-reduced-motion: reduce) {

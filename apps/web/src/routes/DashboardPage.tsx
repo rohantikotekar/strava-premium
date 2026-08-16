@@ -1,6 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import {
   Badge,
   Banner,
@@ -20,14 +17,11 @@ import {
 } from "@/features/charts/charts";
 import { buildCapabilityIndex, resolveCharts } from "@/features/charts/registry";
 import { type CapabilitiesResponse, type DashboardSummary, api } from "@/lib/api";
-import {
-  type UnitPref,
-  formatByUnit,
-  formatDelta,
-  formatDistance,
-  sportLabel,
-} from "@/lib/format";
+import { type UnitPref, formatByUnit, formatDelta, formatDistance, sportLabel } from "@/lib/format";
 import { glossary } from "@/lib/glossary";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 const RANGES = [
   { key: "4w", label: "4 weeks" },
@@ -81,9 +75,8 @@ export function DashboardPage() {
             </Link>
           }
         >
-          Upload the export Strava emailed you and we'll build your fitness curve, personal
-          records, training calendar and more. It usually takes under a minute to become
-          useful.
+          Upload the export Strava emailed you and we'll build your fitness curve, personal records,
+          training calendar and more. It usually takes under a minute to become useful.
         </EmptyState>
       </Card>
     );
@@ -127,8 +120,8 @@ export function DashboardPage() {
 
       {index.totalActivities < 7 && (
         <Banner tone="info" title="Still early days">
-          A few more activities and we can start showing trends. Everything below will get
-          richer as your history fills in.
+          A few more activities and we can start showing trends. Everything below will get richer as
+          your history fills in.
         </Banner>
       )}
 
@@ -142,6 +135,7 @@ export function DashboardPage() {
             range={range}
             sport={sport}
             className={chart.span === 2 ? "lg:col-span-2" : undefined}
+            glossaryKeys={chart.id === "fitness" ? ["ctl", "atl", "tsb"] : undefined}
             tableRows={
               chart.id === "weekly-volume"
                 ? (data) => ({
@@ -175,7 +169,7 @@ export function DashboardPage() {
 
       {locked.length > 0 && (
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Unlock more</h2>
+          <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">Unlock more</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {locked.map((chart) => (
               <UnlockCard key={chart.id} title={chart.title} hint={chart.unlockHint} />
@@ -192,14 +186,16 @@ function SummaryTiles({ summary, pref }: { summary: DashboardSummary; pref: Unit
 
   return (
     <Card>
-      <p className="text-xs text-[var(--text-secondary)]">{summary.period_label}</p>
+      <p className="text-sm font-medium text-[var(--text-secondary)]">{summary.period_label}</p>
 
       {/* Hero figure: proportional figures, >= 48px (dataviz § marks-and-anatomy). */}
-      <p className="mt-1 text-5xl font-semibold tracking-tight text-[var(--text-primary)]">
+      <p className="mt-1 text-6xl font-bold tracking-tight text-[var(--text-primary)]">
         {formatByUnit(summary.hero.value, summary.hero.unit, pref)}
       </p>
       {heroDelta && (
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+        // Not colored: more/less training isn't inherently good or bad, unlike
+        // a stock price — a value judgment here would be misleading.
+        <p className="mt-1.5 text-sm font-medium text-[var(--text-secondary)]">
           {heroDelta} vs. the previous period
         </p>
       )}
@@ -210,14 +206,14 @@ function SummaryTiles({ summary, pref }: { summary: DashboardSummary; pref: Unit
           const entry = tile.key === "load" ? glossary("load_source") : undefined;
           return (
             <div key={tile.key} className="flex flex-col gap-0.5">
-              <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+              <span className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
                 {tile.label}
                 {entry && <InfoDot label={entry.term} what={entry.what} why={entry.why} />}
               </span>
-              <span className="text-xl font-semibold text-[var(--text-primary)]">
+              <span className="text-2xl font-bold text-[var(--text-primary)]">
                 {formatByUnit(tile.value, tile.unit, pref)}
               </span>
-              {delta && <span className="text-xs text-[var(--text-muted)]">{delta}</span>}
+              {delta && <span className="text-sm text-[var(--text-muted)]">{delta}</span>}
             </div>
           );
         })}
@@ -225,7 +221,7 @@ function SummaryTiles({ summary, pref }: { summary: DashboardSummary; pref: Unit
 
       <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
         <Badge>{summary.active_days} active days</Badge>
-        <Badge>Current streak {summary.streak_days}d</Badge>
+        <Badge tone="accent">Current streak {summary.streak_days}d</Badge>
         <Badge>Longest streak {summary.longest_streak_days}d</Badge>
       </div>
     </Card>

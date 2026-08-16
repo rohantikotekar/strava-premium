@@ -3,8 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Strava Premium</title>
+    <title>Training Stats</title>
     <meta name="description" content="Self-hosted analytics over your own Strava data." />
+    <script>
+      // Applied before paint so an explicit theme choice never flashes the
+      // wrong mode on load. Mirrors lib/theme.ts's storage key and values.
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme-preference");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

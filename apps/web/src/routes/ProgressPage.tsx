@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { Card, ChartSkeleton } from "@/components/ui/primitives";
 import { useCurrentUser } from "@/features/auth/useAuth";
 import { ChartCard, UnlockCard } from "@/features/charts/ChartCard";
@@ -13,6 +11,8 @@ import {
 import { buildCapabilityIndex, resolveCharts } from "@/features/charts/registry";
 import { type CapabilitiesResponse, api } from "@/lib/api";
 import { type UnitPref, formatClock, formatDistance, sportLabel } from "@/lib/format";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 export function ProgressPage() {
   const [range, setRange] = useState("1y");
@@ -35,7 +35,7 @@ export function ProgressPage() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">Progress</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Progress</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Am I improving?</p>
         </div>
         <div className="flex gap-2">
@@ -122,7 +122,7 @@ export function ProgressPage() {
 
       {locked.length > 0 && (
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Unlock more</h2>
+          <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">Unlock more</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {locked.map((chart) => (
               <UnlockCard key={chart.id} title={chart.title} hint={chart.unlockHint} />

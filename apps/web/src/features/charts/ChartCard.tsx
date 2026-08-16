@@ -7,10 +7,18 @@
  * (FRONTEND_DESIGN.md § the chart wrapper contract).
  */
 
+import {
+  Badge,
+  Button,
+  Card,
+  ChartSkeleton,
+  EmptyState,
+  InfoDot,
+} from "@/components/ui/primitives";
+import { type ChartResponse, api } from "@/lib/api";
+import { glossary } from "@/lib/glossary";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
-import { Badge, Button, Card, ChartSkeleton, EmptyState } from "@/components/ui/primitives";
-import { type ChartResponse, api } from "@/lib/api";
 
 export function useChart(chartId: string, range: string, sport?: string) {
   const params = new URLSearchParams({ range });
@@ -33,6 +41,10 @@ interface ChartCardProps {
   children: (data: ChartResponse) => ReactNode;
   /** Rows for the table view — the accessibility fallback and contrast relief. */
   tableRows?: (data: ChartResponse) => { headers: string[]; rows: (string | number)[][] };
+  /** Glossary key(s) to surface as inline "?" popovers next to the title —
+   * for charts whose whole subject is unfamiliar jargon (e.g. CTL/ATL/TSB),
+   * not for every chart (FRONTEND_DESIGN.md § copy guidelines). */
+  glossaryKeys?: string[];
   className?: string;
 }
 
@@ -44,6 +56,7 @@ export function ChartCard({
   sport,
   children,
   tableRows,
+  glossaryKeys,
   className,
 }: ChartCardProps) {
   const [showTable, setShowTable] = useState(false);
@@ -56,9 +69,19 @@ export function ChartCard({
     <Card className={className}>
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
+          <h2 className="flex items-center gap-1.5 text-base font-semibold text-[var(--text-primary)]">
+            {title}
+            {glossaryKeys && glossaryKeys.length > 0 && (
+              <InfoDot
+                entries={glossaryKeys
+                  .map((key) => glossary(key))
+                  .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+                  .map((entry) => ({ label: entry.term, what: entry.what, why: entry.why }))}
+              />
+            )}
+          </h2>
           {/* The question comes before the chart — the chart is the evidence. */}
-          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{question}</p>
+          <p className="mt-0.5 text-sm text-[var(--text-secondary)]">{question}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {data?.meta.is_estimate && <Badge tone="estimate">Estimated</Badge>}
@@ -107,9 +130,7 @@ export function ChartCard({
                 <p className="text-xs text-[var(--text-muted)]">{data.meta.coverage_note}</p>
               )}
               {data.meta.estimate_reason && (
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {data.meta.estimate_reason}
-                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{data.meta.estimate_reason}</p>
               )}
             </footer>
           )}
@@ -139,16 +160,20 @@ export function ChartTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            // Row content is the identity here; there is no stable id from the API.
-            <tr key={index} className="border-b border-[var(--border)] last:border-0">
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-2 py-1.5 text-[var(--text-primary)]">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            // No stable id from the API — the row's own content is its identity.
+            const rowKey = row.join("|");
+            return (
+              <tr key={rowKey} className="border-b border-[var(--border)] last:border-0">
+                {row.map((cell, cellIndex) => (
+                  // Keyed by column name, not position — headers are fixed per table.
+                  <td key={headers[cellIndex]} className="px-2 py-1.5 text-[var(--text-primary)]">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

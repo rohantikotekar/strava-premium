@@ -1,13 +1,4 @@
-import {
-  Link,
-  Outlet,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  redirect,
-  useRouterState,
-} from "@tanstack/react-router";
-import { Button, Spinner } from "@/components/ui/primitives";
+import { Button, Spinner, ThemeToggle } from "@/components/ui/primitives";
 import { useCurrentUser, useLogout } from "@/features/auth/useAuth";
 import { type User, api } from "@/lib/api";
 import { queryClient } from "@/queryClient";
@@ -17,6 +8,15 @@ import { ImportPage } from "@/routes/ImportPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { ProgressPage } from "@/routes/ProgressPage";
 import { SettingsPage } from "@/routes/SettingsPage";
+import {
+  Link,
+  Outlet,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  redirect,
+  useRouterState,
+} from "@tanstack/react-router";
 
 /** Cached identity check shared by every route guard. */
 async function fetchUser(): Promise<User | null> {
@@ -135,9 +135,13 @@ function AppShell() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-1)]">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <span className="shrink-0 font-semibold text-[var(--text-primary)]">
-            Strava Premium
+        <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3.5">
+          <span className="shrink-0 flex items-center gap-2 text-lg font-bold tracking-tight text-[var(--text-primary)]">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--accent)]"
+            />
+            Training Stats
           </span>
 
           <nav className="scroll-x flex flex-1 gap-1" aria-label="Main">
@@ -145,10 +149,10 @@ function AppShell() {
               <Link
                 key={item.to}
                 to={item.to}
-                className="shrink-0 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--page)]"
+                className="shrink-0 rounded-lg border-b-2 border-transparent px-3 py-2 text-[0.95rem] text-[var(--text-secondary)] transition-colors hover:bg-[var(--page)]"
                 activeProps={{
                   className:
-                    "shrink-0 rounded-lg px-3 py-2 text-sm font-medium bg-[var(--page)] text-[var(--text-primary)]",
+                    "shrink-0 rounded-lg border-b-2 border-[var(--accent)] px-3 py-2 text-[0.95rem] font-semibold text-[var(--text-primary)]",
                 }}
                 activeOptions={{ exact: item.to === "/" }}
               >
@@ -159,9 +163,8 @@ function AppShell() {
 
           <div className="flex shrink-0 items-center gap-2">
             {isLoading && <Spinner className="text-[var(--text-muted)]" />}
-            <span className="hidden text-xs text-[var(--text-muted)] sm:inline">
-              {user?.email}
-            </span>
+            <span className="hidden text-xs text-[var(--text-muted)] sm:inline">{user?.email}</span>
+            <ThemeToggle />
             <Button
               size="sm"
               variant="ghost"

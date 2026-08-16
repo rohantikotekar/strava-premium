@@ -1,5 +1,6 @@
 from sp_core.storage.objects import (
     PresignedUpload,
+    delete_object,
     delete_prefix,
     ensure_bucket,
     get_bytes,
@@ -15,6 +16,7 @@ from sp_core.storage.parquet import downsample, parquet_to_streams, streams_to_p
 
 __all__ = [
     "PresignedUpload",
+    "delete_object",
     "delete_prefix",
     "downsample",
     "ensure_bucket",

@@ -1,6 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
 import {
   Badge,
   Button,
@@ -30,6 +27,9 @@ import {
   sportLabel,
 } from "@/lib/format";
 import { glossary } from "@/lib/glossary";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useParams } from "@tanstack/react-router";
+import { useState } from "react";
 
 export function ActivitiesPage() {
   const [sport, setSport] = useState("all");
@@ -52,7 +52,7 @@ export function ActivitiesPage() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-[var(--text-primary)]">Activities</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Activities</h1>
         <div className="flex gap-2">
           <input
             type="search"
@@ -98,11 +98,25 @@ export function ActivitiesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left">
-                    {["Activity", "Date", "Distance", "Time", "Pace/Speed", "Load"].map((h) => (
-                      <th key={h} className="py-2 pr-3 font-medium text-[var(--text-secondary)]">
+                    {["Activity", "Date", "Distance", "Time", "Pace/Speed"].map((h) => (
+                      <th
+                        key={h}
+                        className="py-2.5 pr-3 text-sm font-medium text-[var(--text-secondary)]"
+                      >
                         {h}
                       </th>
                     ))}
+                    <th className="py-2.5 pr-3 text-sm font-medium text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-1.5">
+                        Load
+                        {(() => {
+                          const entry = glossary("load_source");
+                          return entry ? (
+                            <InfoDot label={entry.term} what={entry.what} why={entry.why} />
+                          ) : null;
+                        })()}
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,7 +125,7 @@ export function ActivitiesPage() {
                       key={activity.id}
                       className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--page)]"
                     >
-                      <td className="max-w-xs py-2 pr-3">
+                      <td className="max-w-xs py-3 pr-3">
                         <Link
                           to="/activities/$activityId"
                           params={{ activityId: activity.id }}
@@ -125,19 +139,19 @@ export function ActivitiesPage() {
                           {activity.is_indoor && " · indoor"}
                         </span>
                       </td>
-                      <td className="py-2 pr-3 text-[var(--text-secondary)]">
+                      <td className="py-3 pr-3 text-[var(--text-secondary)]">
                         {formatDateTime(activity.start_time_local)}
                       </td>
-                      <td className="py-2 pr-3 tnum text-[var(--text-primary)]">
+                      <td className="py-3 pr-3 tnum text-[var(--text-primary)]">
                         {formatDistance(activity.distance_m, pref)}
                       </td>
-                      <td className="py-2 pr-3 tnum text-[var(--text-primary)]">
+                      <td className="py-3 pr-3 tnum text-[var(--text-primary)]">
                         {formatDuration(activity.moving_time_s ?? activity.elapsed_time_s)}
                       </td>
-                      <td className="py-2 pr-3 tnum text-[var(--text-secondary)]">
+                      <td className="py-3 pr-3 tnum text-[var(--text-secondary)]">
                         {formatVelocity(activity.avg_speed_mps, activity.sport_group, pref)}
                       </td>
-                      <td className="py-2 tnum text-[var(--text-secondary)]">
+                      <td className="py-3 tnum text-[var(--text-secondary)]">
                         {formatNumber(activity.training_load)}
                         {activity.load_source &&
                           ["rpe", "duration"].includes(activity.load_source) && (
@@ -154,8 +168,7 @@ export function ActivitiesPage() {
 
             <nav className="mt-4 flex items-center justify-between">
               <p className="text-xs text-[var(--text-muted)]">
-                {offset + 1}–{Math.min(offset + limit, data.total)} of{" "}
-                {data.total.toLocaleString()}
+                {offset + 1}–{Math.min(offset + limit, data.total)} of {data.total.toLocaleString()}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -213,7 +226,7 @@ export function ActivityDetailPage() {
         <Link to="/activities" className="text-sm text-[var(--text-secondary)] hover:underline">
           ← Back to activities
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--text-primary)]">
           {activity.name || sportLabel(activity.sport_group)}
         </h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -285,8 +298,8 @@ export function ActivityDetailPage() {
       {!activity.has_streams && (
         <Card>
           <EmptyState title="No detailed data for this one.">
-            This activity came from the summary index only. If its .fit or .gpx file was in
-            your export, deeper charts will appear once we've finished analysing it.
+            This activity came from the summary index only. If its .fit or .gpx file was in your
+            export, deeper charts will appear once we've finished analysing it.
           </EmptyState>
         </Card>
       )}
@@ -295,7 +308,7 @@ export function ActivityDetailPage() {
 
       {Object.keys(activity.zone_time.hr ?? {}).length > 0 && (
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">
+          <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
             Heart-rate zones
           </h2>
           <ZonesChart
@@ -306,13 +319,11 @@ export function ActivityDetailPage() {
                   {
                     key: "hr",
                     label: "Time in zone",
-                    points: Object.entries(activity.zone_time.hr ?? {}).map(
-                      ([zone, seconds]) => ({
-                        zone: Number(zone),
-                        label: `Zone ${zone}`,
-                        seconds,
-                      }),
-                    ),
+                    points: Object.entries(activity.zone_time.hr ?? {}).map(([zone, seconds]) => ({
+                      zone: Number(zone),
+                      label: `Zone ${zone}`,
+                      seconds,
+                    })),
                   },
                 ],
               } as unknown as ChartResponse
@@ -323,7 +334,7 @@ export function ActivityDetailPage() {
 
       {Object.keys(activity.distance_prs).length > 0 && (
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">
+          <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
             Best efforts in this activity
           </h2>
           <table className="w-full text-sm">
@@ -428,7 +439,7 @@ function StreamPanels({
 
   return (
     <Card>
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
+      <h2 className="mb-1 text-base font-semibold text-[var(--text-primary)]">
         Through the activity
       </h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
@@ -488,11 +499,7 @@ function StreamPanel({
     <figure className="flex flex-col gap-1">
       <figcaption className="flex items-baseline justify-between text-xs">
         <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
-          <span
-            aria-hidden="true"
-            className="h-2 w-2 rounded-full"
-            style={{ background: color }}
-          />
+          <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: color }} />
           {label}
         </span>
         <span className="tnum text-[var(--text-muted)]">

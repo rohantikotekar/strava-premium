@@ -24,18 +24,17 @@ Four rules that resolve most design arguments:
 ## Information architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  ◎ Strava Premium    Dashboard  Activities  Progress  Map  ● │  top nav, sticky
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ ● Training Stats  Dashboard Activities Progress Import Settings   │
+│                                        you@x.com  [☀/☾]  Sign out │  top nav, sticky
+└──────────────────────────────────────────────────────────────────┘
 
 /                    Dashboard      "How am I doing?"       — the default landing
 /activities          Activity list  filter, search, sort
 /activities/:id      Activity detail "How did that go?"
 /progress            Progress       "Am I improving?"       — PRs, curves, YoY
-/map                 Heatmap        everywhere you've been
-/gear                Gear           mileage + retirement
-/settings            Zones, FTP, units, goals, import history, delete account
 /import              Upload flow (also reachable from an in-app banner)
+/settings            Zones, FTP, units, import history, delete account
 ```
 
 Five nav items. Not eleven. If something doesn't fit, it belongs *inside* one of
@@ -56,200 +55,144 @@ churns instantly.
 Account creation is deliberately **separate from Strava** (full rationale and flows
 in [AUTH.md](AUTH.md)) — signup can never be blocked by Strava's new-app athlete cap,
 and the landing page's job is just to get an account created with the least friction
-possible:
+possible.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                                                            │
-│         See ten years of your training, properly           │
-│                                                            │
-│      All the analysis Strava charges for — plus a few      │
-│      things it doesn't have. Your data stays yours.        │
-│                                                            │
-│              [ G  Continue with Google ]                   │
-│                                                            │
-│              ────────────  or  ────────────                │
-│                                                            │
-│              [ email address              ]                │
-│              [ password                   ]                │
-│              [        Create account      ]                │
-│                                                            │
-│              Already have an account? [ Log in ]           │
+│                                              [☀/☾]          │
+│         See ten years of your training, properly            │
+│                                                              │
+│      All the analysis Strava charges for — plus a few       │
+│      things it doesn't have. Your data stays yours.         │
+│                                                              │
+│              [ G  Continue with Google ]                    │
+│              ────────────  or  ────────────                 │
+│              [ email address              ]                 │
+│              [ password                   ]                 │
+│              [        Create account      ]                 │
+│                                                              │
+│              Already have an account? [ Log in ]            │
 └────────────────────────────────────────────────────────────┘
 ```
 
 Google is the primary button — one tap, no password to invent — with email+password
-as the fallback, not the other way round. `[ Log in ]` swaps the form to email +
-password only (Google users get a **"Continue with Google"** button there too; if
-they mistakenly type a password we show *"This account uses Google sign-in"* rather
-than a generic wrong-password error — see the linking rule in
-[AUTH.md §3](AUTH.md#3-sign-up--log-in--google-oauth-oidc)).
+as the fallback, not the other way round. Password field: a live strength hint
+("12+ characters — a passphrase works great"), never a red error until they've
+actually submitted something too weak. No confirm-password field — a "show
+password" toggle beats it.
 
-Password field: a live strength hint ("12+ characters — a passphrase works great"),
-never a red error until they actually submit something too weak. No confirm-password
-field — it's friction that a "show password" eye icon replaces better.
+This is also the one screen in the app that carries a deliberate branded touch: a
+quiet accent-tinted radial glow behind the card (`.accent-glow` in `index.css`).
+Every other screen is flat — the glow is reserved for this single "welcome" moment
+so it never competes with a chart.
 
-Right after account creation, before anything else, comes the Strava connect screen:
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                                                            │
-│         Connect your Strava account                         │
-│                                                            │
-│      This is how we pull your activities. We only ever      │
-│      read — we never post or modify anything on Strava.     │
-│                                                            │
-│              [  Connect with Strava  ]                     │
-│                                                            │
-│              [ I'll do this later ]                        │
-└────────────────────────────────────────────────────────────┘
-```
-
-Skippable — an account with no Strava connection yet still lands on a real (if
-mostly empty) dashboard with a persistent "Connect Strava" prompt, rather than being
-stuck on this screen. If they connect: after OAuth returns, we already have their
-recent activities via the API. **Show a real dashboard immediately, built from
-whatever the API gives us**, with a persistent banner:
-
-```
-┌────────────────────────────────────────────────────────────┐
-│ ▲  You're seeing your last 30 days. Add your full history  │
-│    to unlock year-over-year trends, all-time PRs, and      │
-│    your fitness curve.        [ Import my history ]  [ ✕ ] │
-└────────────────────────────────────────────────────────────┘
-```
-
-This matters: the user gets value **before** being asked to do the annoying part.
+Right after account creation comes the Strava connect screen — skippable, and an
+account with no connection yet still lands on a real dashboard with a persistent
+"Connect Strava" prompt rather than being stuck here. If they connect: after OAuth
+returns, we already have their recent activities via the API, so a real dashboard
+renders immediately, with a banner offering the full-history import.
 
 **The import wizard** — 3 steps, honest about the wait:
 
 ```
 Step 1 ─ Request your archive from Strava
-   Strava has to prepare your file. It usually takes a few
-   hours, and they'll email you a download link.
-   [ Open Strava's download page ↗ ]      (opens the exact settings page)
-   ┌──────────────────────────────────────────────────────┐
-   │ Already have the .zip? Skip to step 2.               │
-   └──────────────────────────────────────────────────────┘
-   [ Email me a reminder tomorrow ]
+   [ Open Strava's download page ↗ ]   [ Email me a reminder tomorrow ]
 
 Step 2 ─ Upload it here
    ┌──────────────────────────────────────────────────────┐
-   │              Drop your export.zip here               │
-   │                or [ choose a file ]                  │
-   │      Usually 500 MB – 10 GB. You can close this      │
-   │      tab once the upload finishes.                   │
+   │        Drop your export.zip here or [ choose a file ] │
    └──────────────────────────────────────────────────────┘
 
 Step 3 ─ We do the rest
+   Uploading                        ████████░░░  1.9/2.4GB
+   ✓ Found 3,412 activities from Mar 2015 to today
+   ✓ Your dashboard is ready →           [ View it now ]
+   ⟳ Reading detailed data      ██████░░░░░  1,204/2,987
+     Unlocked so far: heart-rate zones, splits, route map
 ```
 
-Progress, driven by the SSE stream from
-[INGESTION §6](INGESTION.md#6-what-the-user-sees-while-this-runs):
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Uploading                        ████████░░░  1.9/2.4GB│
-│  ✓ Found 3,412 activities from Mar 2015 to today        │
-│  ✓ Your dashboard is ready →           [ View it now ]  │
-│  ⟳ Reading detailed data      ██████░░░░░  1,204/2,987  │
-│    Unlocked so far: heart-rate zones, splits, route map │
-└─────────────────────────────────────────────────────────┘
-```
-
-Note "**View it now**" appears the moment the fast path lands. The user does not
-wait for the deep parse.
+"**View it now**" appears the moment the fast path lands — the user does not wait
+for the deep parse.
 
 ### 2. Dashboard
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │  This week                          [ Week ▾ ] [ All sports ▾ ]   │
-│                                                                   │
-│    42.3 km          ← hero figure, 48px                           │
+│                                                                    │
+│    42.3 km          ← hero figure, text-6xl/bold                  │
 │    ↑ 12% vs. your 8-week average                                  │
-│                                                                   │
+│                                                                    │
 │  ┌──────────┬──────────┬──────────┬──────────┐                    │
-│  │ Time     │ Elevation│ Activities│ Load     │   KPI row         │
-│  │ 4h 12m   │ 612 m    │ 5        │ 287      │   each w/ sparkline│
-│  │ ↑ 8%     │ ↓ 4%     │ —        │ ↑ 15%    │   and Δ vs. base   │
+│  │ Time     │ Elevation│ Activities│ Load ⓘ  │   KPI row          │
+│  │ 4h 12m   │ 612 m    │ 5        │ 287      │                    │
 │  └──────────┴──────────┴──────────┴──────────┘                    │
-├───────────────────────────────────────────────────────────────────┤
-│  Form & fitness                                     [ 6 months ▾ ]│
-│  You're building well — fitness is up 9 points this month and     │
-│  you're fresh enough to race.                                     │
+│  [25 active days] [Current streak 4d] [Longest streak 21d]        │
+├────────────────────────────────────────────────────────────────────┤
+│  Fitness & freshness ⓘ                              [Estimated]   │
+│  Am I building fitness, and am I fresh?                           │
 │  ┌───────────────────────────────────────────────────────────┐    │
-│  │  ╱‾‾‾╲___╱‾‾‾‾‾‾╲___  fitness (area, blue)                │    │
-│  │  ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿  fatigue (line, orange)               │    │
+│  │  ╱‾‾‾╲___╱‾‾‾‾‾‾╲___  fitness (area, series-1)             │    │
+│  │  ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿  fatigue (line, series-2)              │    │
 │  ├───────────────────────────────────────────────────────────┤    │
-│  │  ▁▂▃▁▂▄▅▃▁ ▔▔▔▔ ▂▃▅   form (diverging bars, own panel)    │    │
+│  │  ▁▂▃▁▂▄▅▃▁ ▔▔▔▔ ▂▃▅   form (diverging bars, own panel)     │    │
 │  └───────────────────────────────────────────────────────────┘    │
-├───────────────────────────────────────────────────────────────────┤
-│  Training calendar                                    [ 2026 ▾ ]  │
-│  ▪▪▫▪▪▪▫ ▪▫▪▪▪▪▫ … 52-week heatmap, sequential blue                │
-│  238 active days · longest streak 21 days                         │
-├────────────────────────────────┬──────────────────────────────────┤
-│  Weekly volume                 │  Recent activities               │
-│  ▁▃▅▂▆▄▇▅▃  + 4-wk mean line   │  list of 5, each with sparkline   │
-└────────────────────────────────┴──────────────────────────────────┘
+├────────────────────────────────────────────────────────────────────┤
+│  Training calendar                                     [2026 ▾]   │
+├────────────────────────────┬─────────────────────────────────────┤
+│  Weekly volume              │  Sport mix                          │
+└────────────────────────────┴─────────────────────────────────────┘
 ```
 
-Filters live in **one row at the top** and apply to the whole page. They're URL
-state (`/?range=6m&sport=run`), so a view is bookmarkable and shareable.
+The "ⓘ" markers are `InfoDot` — a single "?" affordance even when it explains
+several related terms at once. "Fitness & freshness" covers CTL, ATL and TSB;
+three separate icons next to one title reads as clutter, so `InfoDot` accepts
+either one term or a list and renders **one** icon with everything stacked in the
+popover. Reach for the list form whenever a chart's title already names the
+cluster; a chart explaining one idea still gets one term, one icon.
+
+Filters live in **one row at the top** and apply to the whole page, as URL/component
+state — a view stays consistent as you navigate.
 
 ### 3. Activity detail
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │  ← Back        Morning Run · Tue 4 Aug 2026, 6:42 AM               │
-│                                                     [ Strava ↗ ]  │
-│  ┌────────────────────────────┬──────────────────────────────┐    │
-│  │                            │  12.4 km    ← hero            │   │
-│  │      route map             │  52:18 · 4:13 /km · 148 bpm   │   │
-│  │      (MapLibre)            │  ↑ 212 m · Load 78            │   │
-│  │                            │  🏅 Fastest 10k in 8 months   │   │
-│  └────────────────────────────┴──────────────────────────────┘    │
-│                                                                   │
+│  12.4 km · 52:18 · 4:13/km · 148 bpm · ↑212m · Load 78            │
+│                                                                    │
 │  ┌───────────────────────────────────────────────────────────┐    │
-│  │  pace      ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿   ← stacked panels,     │    │
+│  │  pace      ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿   ← stacked panels,       │    │
 │  ├───────────────────────────────────────────────────────────┤    │
-│  │  heart rate ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿    shared x-axis,        │    │
+│  │  heart rate ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿    shared x-axis,          │    │
 │  ├───────────────────────────────────────────────────────────┤    │
-│  │  elevation ▁▂▄▆▇▅▃▁▂▃▅▇▆▄▂▁          one synced crosshair  │    │
+│  │  elevation ▁▂▄▆▇▅▃▁▂▃▅▇▆▄▂▁          one synced crosshair   │    │
 │  └───────────────────────────────────────────────────────────┘    │
-│      hovering the chart moves a marker along the route map        │
-│                                                                   │
 │  [ Splits ] [ Zones ] [ Best efforts ]     ← tabs, table content   │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
 **Stacked panels, never overlaid dual axes.** Pace, HR, and elevation have unrelated
 scales; overlaying them on two y-axes is the most common fitness-app chart mistake
-and produces false correlations. One panel each, one shared time axis, one crosshair.
+and produces false correlations. One panel each, one shared time axis.
 
 ### 4. Progress
 
-Tabbed: **Records** (PR table + progression) · **Curves** (power/pace curve) ·
-**Zones** (distribution over time) · **Year over year**. Sport selector at the top,
-because a runner and a cyclist want completely different pages here.
+Tabbed by content, not by sport: **Records** (PR table + progression) · **Curves**
+(power/pace curve) · **Zones** (distribution over time) · **Year over year**. A
+sport selector at the top changes what all of them show — a runner and a cyclist
+want completely different pages here.
 
 ### 5. Settings
 
 The screen where trust is won or lost:
 
-- **Zones & thresholds** — max HR, resting HR, FTP. Show which are from Strava, which
-  we estimated, and what changing them will recompute. Changing FTP triggers a
-  visible "recomputing your history…" job, not a silent shift.
-- **Units** — metric/imperial, pace vs. speed per sport.
-- **Import history** — every upload, its status, the failed-file list, re-run button.
-- **Account & security** — email, change password (requires current password),
-  linked sign-in methods (Google — link/unlink; unlink is blocked if it's the
-  *only* sign-in method and no password is set, with a clear explanation why),
-  active sessions list with device/location/last-seen and a revoke button per row,
-  "log out of all other devices".
-- **Strava connection** — connected as `@handle`, last synced, scopes granted,
-  disconnect button (disconnecting stops sync but **does not** delete already-
-  imported history — that's a separate, more explicit action).
+- **Zones & thresholds** — max HR, resting HR, FTP, each with a plain-language hint
+  ("Highest you've actually seen", "Cycling only — roughly what you could hold for
+  an hour"). Changing one triggers a visible "recomputing your history…" job, not a
+  silent shift in every chart's numbers.
+- **Units** — metric/imperial.
+- **Import history** — every upload, its status, the failed-file list.
 - **Your data** — export everything as CSV/Parquet. Delete account (real deletion,
   stated plainly, with what gets removed and when).
 
@@ -261,22 +204,22 @@ The screen where trust is won or lost:
 
 | Library | Used for | Why not one library |
 |---|---|---|
-| **Recharts** | All dashboard/progress charts (bars, lines, areas, stacked, heatmap cells) | React-native composition, easy to theme, fine up to ~2k points |
-| **uPlot** | Activity stream panels, 5k–50k points | Recharts renders SVG nodes per point and dies here. uPlot is canvas, ~1 ms for 100k points, and it has built-in synced cursors across stacked panels — exactly our layout. |
-| **MapLibre GL JS** + **deck.gl** | Route map, personal heatmap | Vector tiles, no Mapbox token, no per-load billing. deck.gl's `HeatmapLayer`/`PathLayer` handles a decade of GPS on the GPU. |
+| **Recharts** | All dashboard/progress charts (bars, lines, areas, stacked) | React-native composition, easy to theme, fine up to ~2k points |
+| **uPlot** | Activity stream panels, 5k–50k points | Recharts renders SVG nodes per point and dies here. uPlot is canvas, ~1 ms for 100k points, and has built-in synced cursors across stacked panels — exactly our layout. |
+| **MapLibre GL JS** + **deck.gl** | Route map, personal heatmap | Vector tiles, no Mapbox token, no per-load billing. |
 
 Wrapped behind `features/charts/` so a component never imports a chart library
-directly — that keeps the theming, empty-state, and accessibility rules in one place
-and makes a library swap a contained change.
+directly — that keeps theming, empty-state, and accessibility rules in one place.
 
 ### Design tokens
 
-Declared once in `src/styles/viz.css` as CSS custom properties, consumed by role.
-Values below are the validated reference palette (see
-`references/palette.md` in the dataviz skill).
+Declared once in `apps/web/src/index.css` as CSS custom properties, consumed by
+role. The categorical/sequential/status values are the validated reference palette
+(see `references/palette.md` in the dataviz skill) and are **chart-only** — never
+repurposed for buttons, nav, or badges (rule 9a below).
 
 ```css
-.viz-root {
+:root {
   color-scheme: light;
   --surface-1: #fcfcfb;  --page: #f9f9f7;
   --text-primary: #0b0b0b;  --text-secondary: #52514e;  --text-muted: #898781;
@@ -289,18 +232,45 @@ Values below are the validated reference palette (see
   --status-good: #0ca30c; --status-warning: #fab219;
   --status-serious: #ec835a; --status-critical: #d03b3b;
   --de-emphasis: #c3c2b7;
+
+  /* Brand accent — UI chrome only: primary buttons, the active nav
+     underline, streak/achievement badges, and the login page's glow.
+     Deliberately a different hue from every --series-N (and from Strava's
+     own #FC4C02 brand orange) so an accented button never reads as chart
+     data, and this unaffiliated product never visually implies endorsement. */
+  --accent: #cc4e10;      /* 4.5:1 on white */
+  --accent-ink: #ffffff;
+  --accent-wash: rgb(204 78 16 / 0.1);
+
+  /* Card elevation. Light mode reads depth from a real drop shadow. */
+  --card-shadow: 0 1px 2px rgb(11 11 11 / 0.05), 0 1px 1px rgb(11 11 11 / 0.04);
+  --card-shadow-hover: 0 8px 20px rgb(11 11 11 / 0.08), 0 2px 6px rgb(11 11 11 / 0.05);
 }
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) .viz-root { /* dark steps */ }
+  :root:where(:not([data-theme="light"])) { /* dark steps, below */ }
 }
-:root[data-theme="dark"] .viz-root {
+:root[data-theme="dark"] {
   color-scheme: dark;
-  --surface-1: #1a1a19;  --page: #0d0d0d;
+  --surface-1: #1a1a19;  --page: #050505;
   --text-primary: #ffffff;  --text-secondary: #c3c2b7;  --text-muted: #898781;
   --gridline: #2c2c2a;  --baseline: #383835;
   --series-1: #3987e5;  --series-2: #d95926;  --series-3: #199e70;
   --series-4: #c98500;  --series-5: #d55181;  --series-6: #008300;
   --series-7: #9085e9;  --series-8: #e66767;
+
+  --accent: #f0793d;      /* 6.2:1 on the dark surface */
+  --accent-ink: #1a1a19;
+  --accent-wash: rgb(240 121 61 / 0.16);
+
+  /* Dark mode CANNOT read depth from a shadow — black-on-near-black is
+     invisible — so it reads depth from a soft ambient shadow plus a 1px
+     "rim light" top edge instead (an inset highlight, the standard dark-UI
+     substitute for shadow). Note --page is darkened to #050505 rather than
+     --surface-1 lightened, specifically so cards separate from the page
+     without touching the surface color the chart-contrast checks above were
+     validated against. */
+  --card-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 2px 8px rgb(0 0 0 / 0.5);
+  --card-shadow-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.6);
 }
 ```
 
@@ -317,6 +287,40 @@ The light-mode WARN is **not dismissable**: aqua (`--series-3`), yellow
 (`--series-4`), and magenta (`--series-5`) sit below 3:1 on the light surface, so any
 chart using them ships **visible direct labels or a table view**. This is enforced in
 the chart wrapper, not left to the author.
+
+### Typography scale
+
+A deliberate, small site-wide bump, not Tailwind defaults left alone:
+
+```css
+html { font-size: 106%; }   /* every rem-based Tailwind size lifts a touch */
+```
+
+On top of that, specific elements take an explicit larger step so the hierarchy
+reads clearly at a glance:
+
+| Element | Class |
+|---|---|
+| Hero figure (dashboard, activity detail) | `text-6xl font-bold tracking-tight` |
+| Page title (`<h1>`: Activities, Progress, Settings…) | `text-3xl font-bold tracking-tight` |
+| Card / chart section header (`<h2>`) | `text-base font-semibold` |
+| KPI tile value | `text-2xl font-bold` |
+| Body copy, table cells | `text-sm` / `text-[0.95rem]` (buttons) |
+
+Everything — including the hero figure — stays in the system sans
+(`system-ui, -apple-system, "Segoe UI", sans-serif`). No display or serif face
+anywhere, and no second (monospace) family either: `.tnum`
+(`font-variant-numeric: tabular-nums`) gets column alignment for tables and axis
+ticks without loading a font.
+
+### Light/dark switching
+
+`lib/theme.ts` + the `ThemeToggle` component (a sun/moon icon button, top-right of
+the nav and of the login page). Three states: `light` / `dark` / `system` — the
+default is `system`, which sets no `data-theme` attribute at all and simply follows
+`prefers-color-scheme`. Choosing an explicit mode pins `data-theme` and persists it
+to `localStorage`; an inline script in `index.html` applies the stored value
+*before paint*, so an explicit choice never flashes the wrong theme on reload.
 
 ### Binding chart rules
 
@@ -344,6 +348,11 @@ These are not style preferences; violations are review-blocking.
    are also direct-labelled. Identity is never carried by color alone.
 9. **Status colors are reserved** for good/warning/serious/critical and always ship
    with an icon + label. `--status-critical` is never "series 8".
+9a. **`--accent` never appears inside a chart mark.** It's UI chrome (buttons, the
+   active nav underline, streak badges, the login glow) — the whole reason it's a
+   distinct hue from every `--series-N` (and from Strava's own brand orange) is so
+   an accented button can sit next to an orange "Ride" segment without the two
+   looking like the same entity, and so the app never visually implies affiliation.
 10. **Marks:** 2px lines, ≥8px hover targets, 4px rounded bar ends at the baseline,
     2px surface gap between stacked segments and adjacent bars, 2px surface ring where
     marks overlap. Grid and axes recessive (`--gridline`, `--text-muted`).
@@ -366,19 +375,19 @@ interface ChartDef {
   id: string;
   title: string;
   question: string;              // the plain-language question it answers
-  requires: Capability[];        // e.g. ["stream.power"] — see CLAUDE.md §5
-  minActivities?: number;
-  minSpan?: Duration;            // e.g. "2y" for year-over-year
-  unlockHint: string;            // shown when requires isn't met
-  estimateNote?: string;         // shown when computed from a fallback
-  Component: React.FC<ChartProps>;
+  requires: string[];             // capabilities, e.g. ["stream.power"] — CLAUDE.md §5
+  minCoverage?: number;
+  minSpanDays?: number;
+  unlockHint: string;             // shown when requires isn't met
+  section: "dashboard" | "progress";
+  span?: 1 | 2;
 }
 ```
 
 `<ChartCard>` handles, uniformly: loading skeleton (chart-shaped, not a spinner),
 empty state, error state with retry, the table-view toggle, the direct-label
-enforcement for low-contrast slots, the download-PNG/CSV action, and the "how is this
-calculated?" popover. **No chart implements those itself.**
+enforcement for low-contrast slots, and the optional glossary `InfoDot` next to the
+title. **No chart implements those itself.**
 
 ---
 
@@ -391,68 +400,59 @@ isn't here, it's a bug to be triaged into here.
 
 | Condition | Behaviour |
 |---|---|
-| Brand-new account, 0 activities | Not an empty dashboard. A "get started" screen: connect ✓, then import history, then a sample-data preview so they can see what they'd get. |
-| Fewer than 7 activities | Trend charts hidden; stat tiles show absolutes with no Δ (a Δ vs. a 2-activity baseline is noise). Message: *"A few more activities and we can start showing trends."* |
+| Brand-new account, 0 activities | Not an empty dashboard. A "get started" screen: connect ✓, then import history. |
+| Fewer than 7 activities | Trend charts hidden; stat tiles show absolutes with no Δ. Message: *"A few more activities and we can start showing trends."* |
 | Less than 2 years of data | Year-over-year card hidden. Not greyed out — hidden. |
-| No heart-rate data ever | All HR charts absent. One card in "Unlock more": *"Wear a heart-rate monitor and we'll show training zones, TRIMP load, and aerobic decoupling."* |
+| No heart-rate data ever | All HR charts absent. One card in "Unlock more" explains what device/data would enable them. |
 | No power meter | Same, for power charts. Do **not** estimate power for runners — it's a fiction. |
 | HR on some activities only | Chart renders with a coverage note: *"Based on 312 of 1,208 activities that have heart rate."* Never silently average over a biased subset. |
-| Only indoor/treadmill activities | Map and heatmap nav items hidden entirely. |
+| Only indoor/treadmill activities | Map and heatmap nav entries hidden entirely. |
 | Single sport only | Sport filter hidden; sport-mix chart hidden. |
 | Sport we don't have a mapping for | Appears under "Other" with its raw Strava name preserved and visible. Never dropped, never mislabelled. |
-| No FTP, no max HR | Fitness curve still renders using the TRIMP/duration fallback, with a visible badge: *"Estimated — [set your zones] for accurate load."* Never silently substitute a default and present it as fact. |
-| User changes FTP or max HR | Explicit confirm: *"This recomputes training load for 3,412 activities. Takes about a minute."* Then a progress toast. |
-
-### Account & auth
-
-| Condition | Behaviour |
-|---|---|
-| Signup email already registered | Response is identical to a successful signup (no enumeration); the actual account owner gets an email — *"Someone tried to sign up with your email — was that you? [Log in]"* |
-| Wrong password on login | Generic *"Incorrect email or password"* — never reveal which half is wrong. After repeated failures, a progressive delay kicks in silently (no scary "account locked" message that itself confirms the email exists). |
-| Signs in with Google using an email that already has a password account | Never auto-linked. *"An account already exists for this email. Log in, then connect Google from Settings."* |
-| Password-only user clicks "Continue with Google" by mistake and it's a different Google identity | Normal Google-first-time flow — becomes a genuinely separate account unless they explicitly link. We don't guess. |
-| Forgot password | Always responds the same regardless of whether the email exists; if it does, a reset link (1-hour expiry, single use) arrives and using it signs the user out everywhere else. |
-| Strava token expired / revoked | Non-blocking amber banner (see Import & sync below) — never signs the user out of *our* account, since Strava is a connection, not identity. |
-| Skipped Strava connect at signup | Dashboard renders empty-state cards with a persistent "Connect Strava" CTA, not a dead end. |
-| Disconnecting Strava | Confirm dialog distinguishes "stop syncing" (keeps history) from "also delete my imported data" (the destructive one), never bundles them. |
-| Session revoked remotely (another tab / device) | Next request gets a clean redirect to login with *"You were signed out — this session ended from another device."*, not a raw 401. |
+| No FTP, no max HR | Fitness curve still renders using the TRIMP/duration fallback, with a visible `Estimated` badge. Never silently substitute a default and present it as fact. |
+| User changes FTP or max HR | Explicit confirm before recomputing training load for every affected activity; a progress toast while it runs. |
 
 ### Import & sync
 
 | Condition | Behaviour |
 |---|---|
 | Upload interrupted | Multipart parts survive; resume from where it stopped, don't restart. |
-| Wrong file uploaded (not a Strava export) | Caught client-side before the upload, with a specific message and a link to the right page. |
-| Zip has no `activities.csv` | *"We couldn't find the activity index in this archive. Is this the file Strava emailed you?"* + what a correct archive looks like. |
-| 12 of 2,987 files failed to parse | Not an error state. Neutral summary + expandable list of filenames and reasons. Import is marked complete. |
-| **All** files failed | This *is* an error. Explicit apology, a "send us the details" button (metadata only, never the file), and the CSV-derived dashboard still works. |
-| Import running when the user returns | Banner resumes with live progress. Reloading never restarts anything. |
-| Second, newer export uploaded | *"We'll merge this with what you already have. Nothing gets duplicated."* |
-| Strava token expired / revoked | Non-blocking amber banner: *"Reconnect Strava to keep syncing new activities. Your existing data is safe."* Historical dashboards keep working. |
-| Strava API rate-limited | Silent to the user. Sync status shows *"Syncing shortly"*, never an error. |
-| Activity deleted on Strava | Removed from our views on the next webhook, with a note in import history so the count change isn't mysterious. |
+| Wrong file uploaded (not a Strava export) | Caught before or right after upload, with a specific message pointing at the right page. |
+| Zip has no `activities.csv` | *"We couldn't find the activity index in this archive. Is this the file Strava emailed you?"* |
+| Some files failed to parse | Not an error state. Neutral summary + expandable list of filenames and reasons. Import is marked complete. |
+| **All** files failed | This *is* an error, with a way to see details. The CSV-derived dashboard, if any landed, still works. |
+| Import running when the user returns | Progress resumes from the server; reloading never restarts anything. |
+| Second, newer export uploaded | Merges with existing history — nothing gets duplicated (natural-key dedupe). |
+| Strava token expired / revoked | Non-blocking banner: reconnect to keep syncing; existing data stays intact. |
+| Activity deleted on Strava | Removed from our views on the next sync, noted in import history. |
+
+### Account & auth
+
+| Condition | Behaviour |
+|---|---|
+| Email already registered at signup | Identical response either way (AUTH.md §5) — the API never confirms or denies an address exists. |
+| Wrong password | Generic *"That email or password isn't right"*, with progressive rate limiting behind the scenes. |
+| Google sign-in, email matches an existing password account | Never auto-linked. Banner: *"An account already exists for that email. Log in, then link Google from Settings."* |
+| Disconnecting Strava | Removes the data connection only — the account, login, and already-imported history are untouched. |
 
 ### Display & interaction
 
 | Condition | Behaviour |
 |---|---|
-| A single 200 km outlier squashes the chart | Never auto-clip silently. Use a robust y-domain (p99) **and** mark the clipped point with an annotation the user can click. |
+| A single 200 km outlier squashes the chart | Never auto-clip silently. Robust y-domain (p99) **and** the clipped point stays visible/interactive. |
 | Activity with 0 distance (yoga, strength) | Duration-based tiles only. Distance shows `—`, never `0.0 km`. |
-| Activity with 30,000 stream points | uPlot handles it; downsample to viewport width with min/max-preserving LTTB so spikes survive. |
-| Paused / multi-segment activity | Gaps in the stream are gaps in the line, not interpolated across. Elapsed vs. moving time both shown. |
-| GPS glitch (a 900 km/h spike) | Flag and exclude from max-speed stats; keep it visible in the raw trace with a marker. Never quietly delete data. |
-| Timezone: activity abroad | Displayed in the activity's **local** time with the zone shown; aggregates by day use local date. |
-| Very long activity names / device junk names | Truncate with a title attribute; never let it break layout. |
-| Slow network | Skeletons shaped like the chart. TanStack Query keeps previous data visible while refetching, so filters never blank the page. |
+| Activity with 30,000 stream points | uPlot handles it; downsample to viewport width with min/max-preserving sampling so spikes survive. |
+| Paused / multi-segment activity | Gaps in the stream are gaps in the line, not interpolated across. |
+| GPS glitch (a 900 km/h spike) | Flagged and excluded from max-speed stats; stays visible in the raw trace. |
+| Activity abroad | Displayed in the activity's **local** time with the zone shown. |
+| Slow network | Skeletons shaped like the chart; previous data stays visible while refetching. |
 | Chart data request fails | Per-card error with retry. One failed card never takes down the dashboard. |
-| Printing / PDF export | Print stylesheet: light tokens, texture fills on, tables expanded. |
 
 ### Accessibility
 
 - Keyboard: every chart is focusable, arrow keys move the crosshair, `Enter` opens
   the table view. Tab order follows visual order.
-- Screen readers: each chart has an `aria-label` summarising the trend in words
-  (*"Weekly distance, last 12 weeks, ranging 18 to 62 km, trending up"*) and the
+- Screen readers: each chart has an `aria-label` summarising the trend in words; the
   table view is the accessible equivalent.
 - Respect `prefers-reduced-motion` — no chart entry animations, instant transitions.
 - Target sizes ≥44px on touch. Hit areas larger than the marks they select.
@@ -466,7 +466,7 @@ The voice is **a knowledgeable training partner, not a coach and not a marketer.
 
 | Do | Don't |
 |---|---|
-| "Your fitness is up 9 points this month." | "Amazing work, superstar! 🔥🔥" |
+| "Your fitness is up 9 points this month." | "Amazing work, superstar!" |
 | "Based on 312 activities with heart rate." | (silence about the subset) |
 | "Estimated — set your max HR for accuracy." | (presenting an estimate as measured) |
 | "12 files couldn't be read. See which ones." | "Import failed." |
@@ -479,5 +479,3 @@ Written once in `lib/glossary.ts`, referenced everywhere.
 
 No streaks-guilt, no notifications about missed workouts, no comparisons to other
 users. This app is a mirror, not a nag.
-</content>
-</invoke>
