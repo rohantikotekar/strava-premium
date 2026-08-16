@@ -188,9 +188,62 @@ $DC exec -T -w /app/packages/db api python -m alembic upgrade head
 
 bold "== 6/6: Cloudflare Tunnel (public HTTPS, no open security-group ports) =="
 if [ -z "${API_DOMAIN:-}" ]; then
-  echo "No API domain was set in step 3, so skipping the Tunnel setup."
-  echo "Once you have a domain on Cloudflare, re-run this script (it will"
-  echo "reuse the existing .env) or follow docs/DEPLOYMENT.md §4 by hand."
+  bold "No domain given — using a free Cloudflare Quick Tunnel instead."
+  echo "No login, no domain needed, but the URL is random and changes if"
+  echo "this service restarts (VM reboot, crash) — fine for testing, get a"
+  echo "real domain (docs/DEPLOYMENT.md §4) before putting real users on it."
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    ARCH=$(uname -m)
+    case "$ARCH" in
+      aarch64|arm64) CF_ARCH=arm64 ;;
+      x86_64) CF_ARCH=amd64 ;;
+      *) echo "Unrecognized arch $ARCH — install cloudflared manually." && exit 1 ;;
+    esac
+    curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -o cloudflared
+    chmod +x cloudflared
+    sudo mv cloudflared /usr/local/bin/
+  fi
+
+  sudo tee /etc/systemd/system/cloudflared-quick.service >/dev/null <<'UNIT'
+[Unit]
+Description=Cloudflare Quick Tunnel (free, no domain)
+After=network.target docker.service
+
+[Service]
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:8000
+Restart=always
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now cloudflared-quick
+
+  echo "Waiting for the tunnel URL..."
+  QUICK_URL=""
+  for i in $(seq 1 15); do
+    QUICK_URL=$(sudo journalctl -u cloudflared-quick --no-pager -n 200 2>/dev/null \
+      | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1)
+    [ -n "$QUICK_URL" ] && break
+    sleep 2
+  done
+
+  if [ -z "$QUICK_URL" ]; then
+    echo "Couldn't auto-detect the URL. Run this and look for a"
+    echo "*.trycloudflare.com line yourself: sudo journalctl -u cloudflared-quick -f"
+  else
+    bold "Quick Tunnel URL: ${QUICK_URL}"
+    sed -i "s#^API_BASE_URL=.*#API_BASE_URL=${QUICK_URL}#" .env
+    echo "Saved to .env's API_BASE_URL. Two things left, both manual (no way"
+    echo "to script them from here since they depend on your frontend deploy):"
+    echo "  1. On your Cloudflare Workers Build project: add a build env var"
+    echo "     VITE_API_BASE=${QUICK_URL}, then redeploy the frontend."
+    echo "  2. Once deployed, note its URL (e.g. https://x.workers.dev), then"
+    echo "     set WEB_BASE_URL and CORS_ORIGINS in this VM's .env to that"
+    echo "     URL and run: docker compose --profile full up -d postgres redis api worker"
+  fi
 else
   if command -v cloudflared >/dev/null 2>&1; then
     echo "cloudflared already installed, skipping install."

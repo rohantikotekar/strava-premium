@@ -23,7 +23,7 @@ For a solo project or early testing, before paying for Railway:
 | Postgres + Redis + API + worker | **One AWS EC2 instance**, running this repo's `docker compose --profile full` as-is | Free-tier eligible for 12 months (legacy accounts) or via signup credits (accounts created July 2025+); **~$12–15/month after** — EC2 has no permanent free tier, unlike Oracle's Always Free shapes | Not free forever — budget for it once the trial window/credits run out |
 | Public HTTPS for that VM | **Cloudflare Tunnel** (free) | Unlimited | Replaces opening security-group ports / managing TLS certs yourself — the tunnel handles HTTPS |
 | Object storage | **Cloudflare R2 free tier** | 10 GB storage, 1M reads + 1M writes/month, egress always free | Kept regardless of which cloud runs compute — R2 was picked for zero egress fees ([ARCHITECTURE.md:159](ARCHITECTURE.md#L159)), switching to S3 here would reintroduce exactly the egress cost that decision avoided |
-| Domain | Skip it — Workers gives a free `*.workers.dev` URL | $0 | A real domain is ~$10/yr whenever you want one |
+| Domain | Skip it — Workers gives a free `*.workers.dev` URL, and [`infra/bootstrap-aws-vm.sh`](../infra/bootstrap-aws-vm.sh) falls back to a free Cloudflare **Quick Tunnel** (`*.trycloudflare.com`) for the backend when no domain is given | $0 | Quick Tunnel URLs are random and change if the tunnel service restarts — fine for testing, get a real domain before real users depend on it |
 
 **Total: $0/month during the free-tier/credit window, ~$12–15/month after** — this is the honest number; see [the AWS section below](#the-honest-tradeoff) for why EC2 can't match Oracle's free-forever deal.
 
