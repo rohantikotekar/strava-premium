@@ -1,0 +1,12 @@
+{
+  "name": "strava-premium",
+  "compatibility_date": "2026-08-16",
+  // Serves apps/web/dist as static assets. not_found_handling routes any
+  // unmatched path to index.html with a 200 — required for TanStack Router's
+  // client-side routes (e.g. /activities/123) to work on a hard refresh
+  // instead of 404ing at the edge.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

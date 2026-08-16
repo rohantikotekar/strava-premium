@@ -4,7 +4,7 @@
 
 | Layer | Service | Why |
 |---|---|---|
-| Frontend | **Cloudflare Pages** | Free, global CDN, git-push deploys, same account as R2 (no cross-service egress) |
+| Frontend | **Cloudflare Workers Builds** (formerly Pages) | Free, global CDN, git-push deploys, same account as R2 (no cross-service egress) |
 | API + worker | **Railway** | Deploys this repo's containers as-is; managed Postgres + Redis; one dashboard; public HTTPS out of the box (required for Strava webhooks later) |
 | Object storage | **Cloudflare R2** | Already the architecture's pick — zero egress fees, S3-compatible, so `S3_ENDPOINT` is the only thing that changes from local MinIO |
 | DNS | **Cloudflare** | Same account as R2; free SSL |
@@ -13,23 +13,54 @@ This is the fast lane from [ARCHITECTURE.md §6](ARCHITECTURE.md#6-scaling-path)
 
 ---
 
-## Free-tier alternative ($0/month)
+## AWS + Cloudflare alternative
 
-For a solo project or early testing, before paying anything:
+For a solo project or early testing, before paying for Railway:
 
-| Layer | Service | Free limit | Catch |
+| Layer | Service | Cost | Catch |
 |---|---|---|---|
-| Frontend | **Cloudflare Pages** | Unlimited, always free | None |
-| Postgres + Redis + API + worker | **One Oracle Cloud "Always Free" VM**, running this repo's `docker compose --profile full` as-is | 4 ARM cores / 24 GB RAM, forever — not a trial | Needs a credit card at signup for identity verification (never charged on the free shapes). Free ARM capacity is sometimes hard to get in a region on first signup — retry if it says "out of capacity." |
-| Public HTTPS for that VM | **Cloudflare Tunnel** (free) | Unlimited | Replaces opening firewall ports / managing TLS certs yourself — the tunnel handles HTTPS |
-| Object storage | **Cloudflare R2 free tier** | 10 GB storage, 1M reads + 1M writes/month, egress always free (even past free tier) | Fine for a solo user; only relevant limit is storage past ~10 GB of everyone's raw exports |
-| Domain | Skip it — Pages gives a free `*.pages.dev` URL | $0 | A real domain is ~$10/yr whenever you want one |
+| Frontend | **Cloudflare Workers Builds** (formerly Pages) | Free, unlimited | None |
+| Postgres + Redis + API + worker | **One AWS EC2 instance**, running this repo's `docker compose --profile full` as-is | Free-tier eligible for 12 months (legacy accounts) or via signup credits (accounts created July 2025+); **~$12–15/month after** — EC2 has no permanent free tier, unlike Oracle's Always Free shapes | Not free forever — budget for it once the trial window/credits run out |
+| Public HTTPS for that VM | **Cloudflare Tunnel** (free) | Unlimited | Replaces opening security-group ports / managing TLS certs yourself — the tunnel handles HTTPS |
+| Object storage | **Cloudflare R2 free tier** | 10 GB storage, 1M reads + 1M writes/month, egress always free | Kept regardless of which cloud runs compute — R2 was picked for zero egress fees ([ARCHITECTURE.md:159](ARCHITECTURE.md#L159)), switching to S3 here would reintroduce exactly the egress cost that decision avoided |
+| Domain | Skip it — Workers gives a free `*.workers.dev` URL | $0 | A real domain is ~$10/yr whenever you want one |
 
-**Total: $0/month, indefinitely** — this isn't a trial that expires.
+**Total: $0/month during the free-tier/credit window, ~$12–15/month after** — this is the honest number; see [the AWS section below](#the-honest-tradeoff) for why EC2 can't match Oracle's free-forever deal.
+
+**Known gap, not yet mitigated:** Postgres runs self-hosted in a container on the EC2 instance's disk — no managed backups, no multi-AZ. CLAUDE.md §4.3's "raw data is rebuildable from object storage" safety net covers activity data (it's re-derivable from the R2 Parquet files) but **not** user accounts, password hashes, or connected Strava tokens, which exist only in that one Postgres container. Losing the EC2 volume loses every account. Worth adding a scheduled `pg_dump` → R2 backup before real users sign up; out of scope for this doc as written.
 
 `infra/api.Dockerfile` and `infra/worker.Dockerfile` (the images the `full` profile builds) were test-built and run end to end against this stack — signup, upload, ingest, charts — before writing the steps below, so this is a verified path, not a guess.
 
-### Step-by-step
+### The fast path: one script
+
+Steps 2 ("AWS EC2 — the VM") and 3–4 ("Deploy the app" / "Cloudflare Tunnel")
+below are all scriptable except one unavoidable OAuth click, and
+[`infra/bootstrap-aws-vm.sh`](../infra/bootstrap-aws-vm.sh) does them for
+you: installs Docker, clones the repo, writes `.env` from prompts (generating
+`SESSION_SECRET`/`TOKEN_ENCRYPTION_KEY`/the Postgres password itself), brings
+the stack up, runs the migration, and installs the Cloudflare Tunnel as a
+systemd service. It's idempotent — re-running it after filling in a domain
+you left blank the first time picks up where it left off.
+
+You still do steps 1 (R2 bucket) and the "launch the instance" half of step 2 by
+hand — those are dashboard clicks, not shell commands, so there's nothing to
+script. Once you've SSHed into the fresh instance:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rohantikotekar/strava-premium/main/infra/bootstrap-aws-vm.sh -o bootstrap.sh
+chmod +x bootstrap.sh
+./bootstrap.sh
+```
+
+It'll ask for the R2 credentials from step 1 and (optionally) your domain.
+Then do step 5 (Cloudflare Workers Builds) — a dashboard click-through, not
+scriptable either — and you're done.
+
+The manual walkthrough below is what the script is automating — read it if
+you want to understand what's happening, or if something in the script fails
+and you need to finish a step by hand.
+
+### Step-by-step (manual — see the fast path above)
 
 #### 1. Cloudflare — R2 bucket (10 minutes)
 
@@ -49,22 +80,26 @@ For a solo project or early testing, before paying anything:
    ```
    (Browsers upload/download stream files directly to R2 via presigned URLs — this is what allows that cross-origin request. See [CLAUDE.md §8](../CLAUDE.md#8-security--privacy).)
 
-#### 2. Oracle Cloud — the VM (15–20 minutes, plus possible retries for capacity)
+#### 2. AWS EC2 — the instance (~10 minutes)
 
-1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) for an **Always Free** account. Requires a card for identity verification; the free-tier shapes are never billed.
-2. **Compute → Instances → Create Instance**.
-   - Image: **Ubuntu 22.04** (or latest LTS).
-   - Shape: **Ampere (ARM) A1.Flex** — set 4 OCPUs / 24 GB (the full free allowance). If it says out of capacity, retry in a different Availability Domain or later — this is the single most common snag with Oracle's free tier.
-   - Add your SSH public key (generate one with `ssh-keygen` if you don't have one).
-   - Create. Note the **public IP**.
-3. SSH in: `ssh ubuntu@<public-ip>`
+1. Sign up / log into the [AWS Console](https://console.aws.amazon.com). Free-tier terms depend on account age — see the table above.
+2. **EC2 → Launch instance**:
+   - **Name**: `strava-premium`
+   - **AMI**: Ubuntu Server 22.04 LTS — arm64 if using a Graviton (`t4g.*`) type, x86 for `t2.*`/`t3.*`.
+   - **Instance type**: two workable choices —
+     - `t4g.small` (2 vCPU, 2GB RAM) — comfortable headroom, no tuning needed. Free-tier eligible only for accounts created July 2025+.
+     - `t2.micro`/`t3.micro` (1 vCPU, 1GB RAM) — the classic 12-month-free legacy shape, fine for a handful of users. [`infra/bootstrap-aws-vm.sh`](../infra/bootstrap-aws-vm.sh) auto-detects instances under 1.5GB RAM and adds a 2GB swap file plus caps Celery to `--concurrency=1`, so a large bulk-export import degrades to slower instead of getting OOM-killed. No manual tuning needed either way — the script handles both sizes.
+   - **Key pair**: create a new one and download the `.pem` — this is what you SSH in with.
+   - **Network settings**: leave the default security group (inbound SSH/port 22 only). No need to open 80/443 — Cloudflare Tunnel (step 4 below) means you never expose a port publicly.
+   - **Storage**: bump to 20GB gp3 (default 8GB is thin for Docker images + Postgres data).
+   - **Launch instance**. Note the **public IPv4 address**.
+3. SSH in: `ssh -i your-key.pem ubuntu@<public-ip>`
 4. Install Docker:
    ```bash
    curl -fsSL https://get.docker.com | sudo sh
    sudo usermod -aG docker $USER
    newgrp docker
    ```
-5. Oracle's default network security list blocks inbound traffic by default — but with Cloudflare Tunnel (step 4 below) you never need to open a port publicly, so leave the firewall closed. Only allow SSH (already open by default on the Oracle-created security list).
 
 #### 3. Deploy the app onto the VM
 
@@ -94,11 +129,11 @@ For a solo project or early testing, before paying anything:
    CORS_ORIGINS=https://app.yourdomain.com
    ```
    Also update the matching password in `infra/postgres-init.sql` (`CREATE ROLE sp_app WITH LOGIN PASSWORD '...'`) to the same real password before first boot — that file only runs once, on the Postgres volume's first init.
-3. Bring the whole stack up:
+3. Bring the stack up — name the four services explicitly so Compose skips `minio`/`minio-init` (those are local-dev-only stand-ins for R2 and would just burn RAM for nothing here):
    ```bash
-   docker compose --profile full up -d --build
+   docker compose --profile full up -d --build postgres redis api worker
    ```
-   This builds `infra/api.Dockerfile` and `infra/worker.Dockerfile` and starts Postgres, Redis, the API, and the worker — five containers, one VM.
+   This builds `infra/api.Dockerfile` and `infra/worker.Dockerfile` and starts Postgres, Redis, the API, and the worker — four containers, one VM. If you're on a 1GB instance (`t2.micro`/`t3.micro`), set `WORKER_CONCURRENCY=1` in `.env` first and add a 2GB swap file — see the script's automatic handling of this if you'd rather not do it by hand.
 4. Run the migration, from inside the running API container (so it uses the internal Docker network — Postgres is never exposed to the internet):
    ```bash
    docker compose exec api python -m alembic -c /app/packages/db/alembic.ini upgrade head
@@ -123,15 +158,19 @@ For a solo project or early testing, before paying anything:
 6. Run it as a service so it survives reboots: `sudo cloudflared service install && sudo systemctl start cloudflared`
 7. `curl https://api.yourdomain.com/health` from your own machine should now return `{"status":"ok"}` — this confirms the tunnel end to end.
 
-#### 5. Cloudflare Pages — the frontend
+#### 5. Cloudflare Workers Builds — the frontend
 
-1. Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → this repo.
-2. Build settings:
+Cloudflare has folded Pages into unified **Workers Builds** — same free static hosting, different setup screen. `apps/web/wrangler.jsonc` (already in the repo) tells it what to serve.
+
+1. Dashboard → **Compute (Workers & Pages)** → **Create application** → **Import a repository** → this repo.
+2. Settings:
    - Root directory: `apps/web`
    - Build command: `pnpm install && pnpm build`
-   - Output directory: `dist`
-3. Add a Pages build-time environment variable: `VITE_API_BASE=https://api.yourdomain.com`. In dev, [api.ts](../apps/web/src/lib/api.ts) talks to `/api` through Vite's proxy (so the session cookie stays first-party); in prod there's no such proxy, so it reads this var instead and calls the tunnel URL directly.
-4. Deploy. Pages gives you `<project>.pages.dev` immediately; add `app.yourdomain.com` under **Custom domains** once ready.
+   - Deploy command: leave the default `npx wrangler deploy`
+   - Non-production branches: leave the default `npx wrangler versions upload` — this gives every non-main push its own preview URL, same role classic Pages' branch previews played
+   - API token: click **Create new token**, accept the auto-generated one — Workers deploys need a token to authenticate, Cloudflare scopes it automatically
+3. Add a build-time environment variable: `VITE_API_BASE=https://api.yourdomain.com`. In dev, [api.ts](../apps/web/src/lib/api.ts) talks to `/api` through Vite's proxy (so the session cookie stays first-party); in prod there's no such proxy, so it reads this var instead and calls the tunnel URL directly.
+4. Deploy. You get a `*.workers.dev` URL immediately; add `app.yourdomain.com` under the Worker's **Settings → Domains & Routes** once ready.
 
 #### 6. Verify
 
@@ -139,7 +178,9 @@ Open `https://app.yourdomain.com`, sign up, and run through Import with a real (
 
 ### The honest tradeoff
 
-One VM means **no redundancy** — if it reboots or Oracle reclaims it (rare on Always Free, but it's not an SLA), the whole backend is down until you notice and restart the containers. Fine for personal use or a beta; move to the Railway plan above the moment real users depend on uptime. Nothing about the migration is a rewrite — same Docker images, same env vars, just swap where they run.
+One instance means **no redundancy** — if it reboots or AWS reclaims/stops it, the whole backend is down until you notice and restart the containers (Docker restarts containers automatically on an instance reboot; an actual instance termination needs you to redo step 2/3). Fine for personal use or a beta; move to the Railway plan above the moment real users depend on uptime. Nothing about the migration is a rewrite — same Docker images, same env vars, just swap where they run.
+
+Unlike Oracle's Always Free tier, **this isn't free indefinitely** — EC2's free allowance is a 12-month window (legacy accounts) or a prepaid credit balance (accounts created July 2025+). Budget ~$12–15/month once that runs out. If $0-forever is the hard requirement rather than "cheap and easy," Oracle Cloud's Always Free `A1.Flex` shape is still the only genuinely permanent free option among mainstream providers — this AWS path trades that guarantee for AWS's more familiar console and IAM/tooling ecosystem.
 
 ---
 
@@ -189,15 +230,14 @@ One VM means **no redundancy** — if it reboots or Oracle reclaims it (rare on 
    ```
    Same non-superuser-role requirement applies as local dev — run [infra/postgres-init.sql](../infra/postgres-init.sql)'s `sp_app` role creation against the Railway database first (Railway's default user is enough of a superuser to bypass RLS otherwise — CLAUDE.md §4.5).
 
-### 3. Cloudflare Pages (frontend)
+### 3. Cloudflare Workers Builds (frontend)
 
-1. Pages → Create project → connect the same GitHub repo.
-2. Build settings:
-   - Root directory: `apps/web`
-   - Build command: `pnpm install && pnpm build`
-   - Output directory: `dist`
-3. Environment variable: point the Vite dev-proxy equivalent at production — actually simpler, since in prod the frontend calls `API_BASE_URL` directly rather than through Vite's proxy. Add a build-time env var or a small runtime config if you want to avoid a rebuild per API URL change (out of scope for v1 — hardcoding `https://api.yourdomain.com` in an env file read at build time is fine to start).
-4. Attach `app.yourdomain.com` as a custom domain (Pages → Custom domains).
+Same steps as the free-tier walkthrough's [step 5](#5-cloudflare-workers-builds--the-frontend) — Cloudflare folded Pages into unified Workers Builds, `apps/web/wrangler.jsonc` already configures it:
+
+1. **Compute (Workers & Pages)** → Create application → Import a repository → this repo.
+2. Root directory `apps/web`, build command `pnpm install && pnpm build`, deploy command left at its default `npx wrangler deploy`.
+3. Environment variable: point the Vite dev-proxy equivalent at production — actually simpler, since in prod the frontend calls `API_BASE_URL` directly rather than through Vite's proxy. Add a build-time env var (`VITE_API_BASE`) or a small runtime config if you want to avoid a rebuild per API URL change (out of scope for v1 — hardcoding `https://api.yourdomain.com` at build time is fine to start).
+4. Attach `app.yourdomain.com` under the Worker's **Settings → Domains & Routes**.
 
 ### 4. Point Strava at production (once OAuth/webhooks land — currently schema-only, see [STRAVA_API.md](STRAVA_API.md))
 
