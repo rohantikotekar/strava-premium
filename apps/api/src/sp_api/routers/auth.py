@@ -133,7 +133,7 @@ async def _issue_session(
         max_age=settings.session_ttl_days * 86400,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
         path="/",
     )
 

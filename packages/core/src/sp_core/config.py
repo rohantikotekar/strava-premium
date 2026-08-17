@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     session_secret: str = "dev-only-not-a-real-secret-change-me"
     token_encryption_key: str = ""
     cookie_secure: bool = False
+    #: "lax" is the real default (CLAUDE.md §8) — only cross-site test setups
+    #: (frontend and backend on unrelated domains, e.g. a free-tier deploy with
+    #: no custom domain) need "none", because Lax cookies aren't sent on
+    #: cross-site fetch/XHR. Never set this to "none" once frontend and API
+    #: share a registrable domain; there is no reason to weaken it then.
+    cookie_samesite: str = "lax"
     session_ttl_days: int = 30
 
     # app
