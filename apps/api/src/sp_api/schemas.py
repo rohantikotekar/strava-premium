@@ -23,6 +23,8 @@ class Message(BaseModel):
 
     message: str
     ok: bool = True
+    #: Set only when ``auth_bearer_tokens`` is on. See UserOut.session_token.
+    session_token: str | None = None
 
 
 # ---- auth -------------------------------------------------------------------
@@ -69,6 +71,10 @@ class UserOut(BaseModel):
     has_google: bool
     strava_connected: bool
     created_at: datetime
+    #: The raw session token, returned by signup/login only when
+    #: ``auth_bearer_tokens`` is on. Never populated by /me or any other
+    #: endpoint — this is the one moment the client is allowed to see it.
+    session_token: str | None = None
 
 
 class SessionOut(BaseModel):

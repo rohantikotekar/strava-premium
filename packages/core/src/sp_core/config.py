@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     #: cross-site fetch/XHR. Never set this to "none" once frontend and API
     #: share a registrable domain; there is no reason to weaken it then.
     cookie_samesite: str = "lax"
+    #: Also accept the session token as `Authorization: Bearer`, and return it in
+    #: the signup/login response body so the frontend can store it.
+    #:
+    #: Off by default, and it should stay off: the token has to live somewhere
+    #: JavaScript can read it, so any XSS becomes account takeover — which is
+    #: exactly what the httpOnly cookie prevents (CLAUDE.md §8). The one case
+    #: that needs it is a frontend and API on unrelated registrable domains
+    #: (e.g. *.workers.dev talking to *.trycloudflare.com), where browsers drop
+    #: the cookie as third-party regardless of SameSite. Put both on subdomains
+    #: of one domain and turn this back off.
+    auth_bearer_tokens: bool = False
     session_ttl_days: int = 30
 
     # app

@@ -1,4 +1,4 @@
-import { type AuthProviders, type User, api } from "@/lib/api";
+import { ApiError, type AuthProviders, type User, api, setSessionToken } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 /**
@@ -13,7 +13,11 @@ export function useCurrentUser() {
     queryFn: async () => {
       try {
         return await api.get<User>("/auth/me");
-      } catch {
+      } catch (error) {
+        // Only a real 401 means the session is gone — drop any stored bearer
+        // token so it stops riding along on every later request. A network
+        // failure must not wipe a token that is still perfectly valid.
+        if (error instanceof ApiError && error.isUnauthorized) setSessionToken(null);
         return null;
       }
     },
@@ -60,6 +64,9 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api.post<{ message: string }>("/auth/logout"),
     onSuccess: () => {
+      // The server revokes the session row; this drops our copy of the token so
+      // a signed-out tab can't keep presenting it.
+      setSessionToken(null);
       queryClient.setQueryData(["auth", "me"], null);
       queryClient.clear();
     },

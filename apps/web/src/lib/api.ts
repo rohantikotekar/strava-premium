@@ -14,6 +14,38 @@
 // build-time env var — see DEPLOYMENT.md § Cloudflare Pages.
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
+/**
+ * Bearer-token fallback for cross-site deployments.
+ *
+ * The session is normally an httpOnly cookie that JS never touches. But when the
+ * API lives on an unrelated registrable domain (a *.workers.dev frontend calling
+ * a *.trycloudflare.com API), browsers drop that cookie as third-party no matter
+ * what SameSite says, so the server can be told to also return the token in the
+ * signup/login body and accept it as `Authorization: Bearer`.
+ *
+ * Storing it here means XSS can read it — see the server's `auth_bearer_tokens`
+ * setting. When the server leaves that off, nothing below ever fires: no token
+ * comes back, none is stored, and the cookie keeps doing the work.
+ */
+const TOKEN_KEY = "sp_session_token";
+
+function readToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null; // storage disabled (private mode, blocked cookies)
+  }
+}
+
+export function setSessionToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Non-fatal: without storage the cookie path is the only one, which is fine.
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -30,12 +62,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = readToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     // The session is an httpOnly cookie; without this it is never sent.
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -52,7 +86,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+
+  const data: unknown = await response.json();
+  // Signup and login are the only endpoints that ever carry a token, and only
+  // when the server has the bearer path enabled. Capturing it centrally keeps
+  // every other call site unaware that any of this exists.
+  if (data !== null && typeof data === "object" && "session_token" in data) {
+    const token = (data as { session_token?: unknown }).session_token;
+    if (typeof token === "string" && token) setSessionToken(token);
+  }
+  return data as T;
 }
 
 export const api = {

@@ -33,22 +33,44 @@ DbSession = Annotated[AsyncSession, Depends(db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
+def bearer_token(request: Request) -> str | None:
+    """Read the session token from ``Authorization: Bearer <token>``.
+
+    Only consulted when ``auth_bearer_tokens`` is on — see that setting for why
+    it exists and why it defaults to off.
+    """
+    if not get_settings().auth_bearer_tokens:
+        return None
+    header = request.headers.get("authorization")
+    if not header:
+        return None
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+    return value.strip() or None
+
+
 async def current_user_optional(
+    request: Request,
     session: DbSession,
     sp_session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> User | None:
-    """Resolve the session cookie to a user, and scope the transaction to them.
+    """Resolve the session token to a user, and scope the transaction to them.
 
     Setting ``app.user_id`` here is what activates every RLS policy for the rest of
     the request — a handler that forgets a ``WHERE user_id`` still cannot read
     another tenant's rows (CLAUDE.md §4.5).
+
+    The cookie wins when both are present: it's the safer carrier, so a stale
+    bearer token in localStorage can never shadow a live cookie session.
     """
-    if not sp_session:
+    presented = sp_session or bearer_token(request)
+    if not presented:
         return None
 
     row = (
         await session.execute(
-            select(SessionRow).where(SessionRow.token_hash == hash_token(sp_session))
+            select(SessionRow).where(SessionRow.token_hash == hash_token(presented))
         )
     ).scalar_one_or_none()
 

@@ -53,6 +53,7 @@ from sp_api.deps import (
     CurrentUser,
     DbSession,
     OptionalUser,
+    bearer_token,
     client_ip,
 )
 from sp_api.schemas import (
@@ -109,11 +110,12 @@ async def _log_event(
 
 async def _issue_session(
     session: DbSession, user: User, request: Request, response: Response
-) -> None:
-    """Create an opaque server-side session and set the cookie.
+) -> str:
+    """Create an opaque server-side session, set the cookie, return the raw token.
 
     We store only the token's hash, so a database read cannot be replayed as a
-    login (AUTH.md §4).
+    login (AUTH.md §4). The raw token is returned for the bearer-token path — see
+    `_bearer_token_for_client`, which decides whether the client may see it.
     """
     settings = get_settings()
     token = generate_token()
@@ -142,6 +144,12 @@ async def _issue_session(
     # very next request — the browser would follow the post-signup redirect and be
     # told it isn't signed in.
     await session.commit()
+    return token
+
+
+def _bearer_token_for_client(token: str) -> str | None:
+    """The token, but only if this deployment hands it to JavaScript at all."""
+    return token if get_settings().auth_bearer_tokens else None
 
 
 async def _user_out(session: DbSession, user: User) -> UserOut:
@@ -260,15 +268,16 @@ async def signup(
     )
 
     # Product access is not blocked on verification; sensitive actions are.
-    await _issue_session(session, user, request, response)
+    session_token = await _issue_session(session, user, request, response)
     await _log_event(session, event="signup", request=request, user_id=user.id, email=email)
     log.info("auth.signup.ok", user_id=str(user.id))
 
+    bearer = _bearer_token_for_client(session_token)
     hint = _dev_hint("verify-email", token)
     if hint:
         log.warning("auth.signup.dev_verification_link", link=hint)
-        return Message(message=f"{_GENERIC_SIGNUP} [dev] {hint}")
-    return Message(message=_GENERIC_SIGNUP)
+        return Message(message=f"{_GENERIC_SIGNUP} [dev] {hint}", session_token=bearer)
+    return Message(message=_GENERIC_SIGNUP, session_token=bearer)
 
 
 @router.post("/login", response_model=UserOut)
@@ -310,10 +319,12 @@ async def login(
         user.password_hash = hash_password(payload.password)
 
     await ratelimit.clear("login_email", email)
-    await _issue_session(session, user, request, response)
+    session_token = await _issue_session(session, user, request, response)
     await _log_event(session, event="login_password", request=request, user_id=user.id, email=email)
     log.info("auth.login.ok", user_id=str(user.id), method="password")
-    return await _user_out(session, user)
+    out = await _user_out(session, user)
+    out.session_token = _bearer_token_for_client(session_token)
+    return out
 
 
 @router.post("/logout", response_model=Message)
@@ -324,10 +335,13 @@ async def logout(
     user: OptionalUser,
     sp_session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> Message:
-    if sp_session:
+    # Revoke whichever carrier the client actually presented, or a bearer-token
+    # session would survive its own logout.
+    presented = sp_session or bearer_token(request)
+    if presented:
         row = (
             await session.execute(
-                select(SessionRow).where(SessionRow.token_hash == hash_token(sp_session))
+                select(SessionRow).where(SessionRow.token_hash == hash_token(presented))
             )
         ).scalar_one_or_none()
         if row is not None:
