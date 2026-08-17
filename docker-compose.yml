@@ -95,6 +95,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_REGION: ${S3_REGION:-us-east-1}
       SESSION_SECRET: ${SESSION_SECRET:-dev-only-not-a-real-secret-change-me}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-dev-only-fernet-key-generated-on-boot}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
