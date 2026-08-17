@@ -14,6 +14,10 @@
 services:
   postgres:
     image: postgres:17-alpine
+    # Come back by themselves after a host reboot or an EC2 stop/start, rather
+    # than needing someone to SSH in and re-run `up`. "unless-stopped" and not
+    # "always" so an explicit `docker compose stop` stays stopped.
+    restart: unless-stopped
     environment:
       POSTGRES_USER: sp
       POSTGRES_PASSWORD: sp_dev_password
@@ -33,6 +37,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: redis-server --save "" --appendonly no
     ports:
       - "6379:6379"
@@ -44,6 +49,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -77,6 +83,7 @@ services:
   # ---- application services (profile: full) --------------------------------
   api:
     profiles: ["full"]
+    restart: unless-stopped
     build:
       context: .
       dockerfile: infra/api.Dockerfile
@@ -111,6 +118,7 @@ services:
 
   worker:
     profiles: ["full"]
+    restart: unless-stopped
     build:
       context: .
       dockerfile: infra/worker.Dockerfile
